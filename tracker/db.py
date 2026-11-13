@@ -35,12 +35,11 @@ def insert_ignore(conn, table: str, rows: list[dict], conflict: str | None = Non
     target = f"({conflict})" if conflict else ""
     sql = (f"insert into {table} ({', '.join(cols)}) values ({placeholders}) "
            f"on conflict {target} do nothing")
-    count = 0
+    # executemany 會用 pipeline 模式一次送出多筆，避免每筆都等一次網路往返
+    # （GitHub 主機在美國、資料庫在東京，逐筆寫入上萬筆會花半小時以上）
     with conn.cursor() as cur:
-        for row in rows:
-            cur.execute(sql, [adapt(row[c]) for c in cols])
-            count += cur.rowcount
-    return count
+        cur.executemany(sql, [[adapt(row[c]) for c in cols] for row in rows])
+        return max(cur.rowcount, 0)
 
 
 def upsert(conn, table: str, rows: list[dict], key: str, update_cols: list[str]) -> int:
@@ -53,8 +52,7 @@ def upsert(conn, table: str, rows: list[dict], key: str, update_cols: list[str])
     sql = (f"insert into {table} ({', '.join(cols)}) values ({placeholders}) "
            f"on conflict ({key}) do update set {sets}")
     with conn.cursor() as cur:
-        for row in rows:
-            cur.execute(sql, [adapt(row[c]) for c in cols])
+        cur.executemany(sql, [[adapt(row[c]) for c in cols] for row in rows])
     return len(rows)
 
 
