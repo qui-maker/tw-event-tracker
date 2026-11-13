@@ -27,20 +27,23 @@ def gdelt(timespan: str = "1d", log=None) -> list[dict]:
     rows, seen = [], set()
     for i, (topic, query) in enumerate(GDELT_QUERIES.items()):
         if i:
-            time.sleep(6)  # GDELT 規定每 5 秒最多 1 次
-        try:
-            resp = http_get(GDELT_URL, params={"query": query, "mode": "artlist", "format": "json",
-                                               "maxrecords": GDELT_MAX_RECORDS, "timespan": timespan,
-                                               "sort": "hybridrel"}, timeout=40)
+            time.sleep(8)  # GDELT 規定每 5 秒最多 1 次；實測 6 秒仍會被擋，放寬到 8 秒
+        articles, last_msg = None, ""
+        for attempt in range(3):
             try:
+                resp = http_get(GDELT_URL, params={"query": query, "mode": "artlist", "format": "json",
+                                                   "maxrecords": GDELT_MAX_RECORDS, "timespan": timespan,
+                                                   "sort": "hybridrel"}, timeout=40)
                 articles = resp.json().get("articles", [])
-            except ValueError:
-                if log:
-                    log.error(f"GDELT {topic}", f"回應不是 JSON：{resp.text[:150]}")
-                continue
-        except Exception as e:  # noqa: BLE001
+                break
+            except ValueError:  # 被限流時 GDELT 回傳純文字說明，不是 JSON
+                last_msg = f"回應不是 JSON：{resp.text[:150]}"
+            except Exception as e:  # noqa: BLE001
+                last_msg = f"{type(e).__name__}: {e}"
+            time.sleep(12 * (attempt + 1))
+        if articles is None:
             if log:
-                log.error(f"GDELT {topic}", f"{type(e).__name__}: {e}")
+                log.error(f"GDELT {topic}", last_msg)
             continue
         for a in articles:
             url, title = a.get("url"), (a.get("title") or "").strip()
