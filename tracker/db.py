@@ -97,6 +97,11 @@ class RunLog:
     def __enter__(self):
         env = "GitHub Actions" if os.getenv("GITHUB_ACTIONS") == "true" else "本機"
         sha = os.getenv("GITHUB_SHA") or _git_sha()
+        # 被取消或逾時的執行不會自己收尾；超過 2 小時還是「執行中」的，標成中斷
+        self.conn.execute(
+            "update pipeline_runs set status = 'failed', finished_at = now(), "
+            "errors = errors || %s where status = 'running' and started_at < now() - interval '2 hours'",
+            (Jsonb([{"step": "系統", "message": "執行中斷（被取消或逾時），沒有正常結束"}]),))
         row = fetch_one(self.conn, "insert into pipeline_runs (job, environment, git_sha) values (%s, %s, %s) returning id",
                         (self.job, env, sha))
         self.conn.commit()
