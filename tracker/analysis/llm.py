@@ -22,13 +22,14 @@ class LLMError(RuntimeError):
 _model_cache: dict[str, str] = {}
 
 
-def _pick_gemini_model(client) -> str:
-    """自動挑選可用的 Flash 系列模型（優先正式版、非 lite）。可用 GEMINI_MODEL 指定。"""
+def gemini_candidates(client) -> list[str]:
+    """可用的 Gemini Flash 系列模型，依偏好排序（正式版優先、非 lite 優先、版本新的優先）。
+    設定 GEMINI_MODEL 時只用指定的模型。實測：最新的模型常因需求過高回 503，所以要能依序改用下一個。"""
     if os.getenv("GEMINI_MODEL"):
-        return os.environ["GEMINI_MODEL"]
+        return [os.environ["GEMINI_MODEL"]]
     if "gemini" in _model_cache:
         return _model_cache["gemini"]
-    skip = ("image", "tts", "audio", "live", "embedding", "veo", "imagen", "thinking-exp", "computer")
+    skip = ("image", "tts", "audio", "live", "embedding", "veo", "imagen", "thinking-exp", "computer", "omni")
     names = []
     for m in client.models.list():
         name = (m.name or "").replace("models/", "")
@@ -40,8 +41,16 @@ def _pick_gemini_model(client) -> str:
     def rank(n: str):
         nums = [int(x) for x in re.findall(r"\d+", n.split("-flash")[0])] or [0]
         return ("preview" not in n and "exp" not in n, "lite" not in n, nums, n)
-    _model_cache["gemini"] = sorted(names, key=rank)[-1]
+    _model_cache["gemini"] = sorted(names, key=rank, reverse=True)
     return _model_cache["gemini"]
+
+
+def _is_overloaded(msg: str) -> bool:
+    return any(k in msg for k in ("503", "UNAVAILABLE", "500", "INTERNAL", "overloaded", "high demand"))
+
+
+def _is_quota(msg: str) -> bool:
+    return any(k in msg for k in ("429", "RESOURCE_EXHAUSTED"))
 
 
 def generate_json(prompt: str, schema: type[BaseModel], system: str, temperature: float = 0.2) -> tuple[BaseModel, str]:
@@ -60,25 +69,32 @@ def _gemini(prompt, schema, system, temperature):
     if not key:
         raise LLMError("沒有設定 GEMINI_API_KEY")
     client = genai.Client(api_key=key)
-    model = _pick_gemini_model(client)
     config = types.GenerateContentConfig(system_instruction=system, temperature=temperature,
                                          response_mime_type="application/json", response_schema=schema)
-    last = None
-    for attempt in range(4):
-        try:
-            resp = client.models.generate_content(model=model, contents=prompt, config=config)
-            parsed = resp.parsed if isinstance(resp.parsed, schema) else schema.model_validate_json(_strip(resp.text))
-            return parsed, model
-        except Exception as e:  # noqa: BLE001
-            last = e
-            msg = str(e)
-            if any(k in msg for k in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "500")) and attempt < 3:
-                time.sleep(20 * (attempt + 1))  # 免費額度限流時等一下再試
-                continue
-            if "validation" in msg.lower() and attempt < 1:
-                continue
-            break
-    raise LLMError(f"Gemini 呼叫失敗：{type(last).__name__}: {str(last)[:500]}")
+    tried = []
+    for model in gemini_candidates(client)[:5]:
+        last = None
+        for attempt in range(3):
+            try:
+                resp = client.models.generate_content(model=model, contents=prompt, config=config)
+                parsed = resp.parsed if isinstance(resp.parsed, schema) else schema.model_validate_json(_strip(resp.text))
+                if tried:  # 換過模型就記下來，讓研究紀錄看得出這次用的不是首選模型
+                    print(f"  首選模型無法使用，改用 {model}（失敗：{'；'.join(tried)}）")
+                return parsed, model
+            except Exception as e:  # noqa: BLE001
+                last, msg = e, str(e)
+                if "limit: 0" in msg or "not found" in msg.lower() or "NOT_FOUND" in msg:
+                    break  # 這個模型不在免費額度或不存在：直接換下一個
+                if (_is_overloaded(msg) or _is_quota(msg)) and attempt < 2:
+                    time.sleep(15 * (attempt + 1))
+                    continue
+                if "validation" in msg.lower() and attempt < 1:
+                    continue
+                if _is_overloaded(msg) or _is_quota(msg):
+                    break  # 重試後仍忙碌或額度用完：換下一個模型
+                raise LLMError(f"Gemini（{model}）呼叫失敗：{type(e).__name__}: {msg[:500]}") from e
+        tried.append(f"{model}：{type(last).__name__}: {str(last)[:120]}")
+    raise LLMError("所有 Gemini 模型都無法使用：" + "；".join(tried))
 
 
 def _claude(prompt, schema, system, temperature):

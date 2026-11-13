@@ -50,13 +50,15 @@ def main():
                 print(f"  證交所回應：{res['stat']}（今天可能休市或資料尚未公布）")
             else:
                 traded = True
-                log.add("index_daily(類股)", insert_ignore(conn, "index_daily", res["indices"], conflict="index_code, trade_date"))
+                # 加權指數一律以 FMTQIK 為準（決策紀錄），這裡只寫入類股與其他指數
+                sectors = [r for r in res["indices"] if r["index_code"] != "TAIEX"]
+                log.add("index_daily(類股)", insert_ignore(conn, "index_daily", sectors, conflict="index_code, trade_date"))
                 if res["breadth"]:
                     log.add("market_breadth", insert_ignore(conn, "market_breadth", [res["breadth"]], conflict="trade_date, market"))
                 save_stocks(conn, log, res["stocks"], "TWSE")
         if not traded:
             with step(log, conn, "類股指數（OpenAPI 備援）"):
-                rows = [r for r in twse.indices_openapi_latest() if r["trade_date"] == d]
+                rows = [r for r in twse.indices_openapi_latest() if r["trade_date"] == d and r["index_code"] != "TAIEX"]
                 log.add("index_daily(類股備援)", insert_ignore(conn, "index_daily", rows, conflict="index_code, trade_date"))
         with step(log, conn, "三大法人"):
             log.add("institutional_flows", insert_ignore(conn, "institutional_flows", twse.institutional(d),

@@ -44,3 +44,42 @@ def test_relative_grade():
     assert 1.9 < z < 2.0
     assert rel_label(z) == "偏大"
     assert rel_label(2.6) == "極端" and rel_label(0.3) == "正常" and rel_label(None) == "資料不足"
+
+
+def test_gemini_falls_back_when_model_overloaded(monkeypatch):
+    """最新模型回 503 時，要自動改用下一個模型，並回報實際使用的模型。"""
+    import types as pytypes
+    from pydantic import BaseModel
+    from tracker.analysis import llm
+
+    class Out(BaseModel):
+        ok: bool
+
+    calls = []
+
+    class FakeModels:
+        def list(self):
+            return [pytypes.SimpleNamespace(name=f"models/{n}", supported_actions=["generateContent"])
+                    for n in ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite", "gemini-omni-flash-preview"]]
+
+        def generate_content(self, model, contents, config=None):
+            calls.append(model)
+            if model == "gemini-3.8-flash":
+                raise RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
+            return pytypes.SimpleNamespace(parsed=Out(ok=True), text='{"ok": true}')
+
+    class FakeClient:
+        def __init__(self, api_key):
+            self.models = FakeModels()
+
+    import google.genai
+    monkeypatch.setattr(google.genai, "Client", FakeClient)
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("AI_PROVIDER", raising=False)
+    llm._model_cache.clear()
+    obj, model = llm.generate_json("x", Out, "sys")
+    assert obj.ok and model == "gemini-3.7-flash"
+    assert calls == ["gemini-3.8-flash"] * 3 + ["gemini-3.7-flash"]
+    assert llm.gemini_candidates(None)[:3] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite"]

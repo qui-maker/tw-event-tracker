@@ -52,11 +52,15 @@ def main():
             event_ids = events.analyze(conn, log, today)
 
         target = prediction_target(conn, now)
-        print(f"  事前判斷目標交易日：{target}")
-        with step(log, conn, "對照規則預測"):
-            predict.baseline(conn, log, target, now)
-        with step(log, conn, "AI 事前預測"):
-            predict.ai_prediction(conn, log, target, now, event_ids)
+        if target == today:
+            print(f"  事前判斷目標交易日：{target}")
+            with step(log, conn, "對照規則預測"):
+                predict.baseline(conn, log, target, now)
+            with step(log, conn, "AI 事前預測"):
+                predict.ai_prediction(conn, log, target, now, event_ids)
+        else:
+            # 只在目標交易日當天開盤前做判斷，才能納入週末與前一晚的最新資訊（決策紀錄 #23）
+            print(f"  今天不是交易日或已過 09:00 開盤，事前判斷留到 {target} 當天早上再做")
         with step(log, conn, "補做評估"):
             evaluate.run(conn, log, today - timedelta(days=1))
 

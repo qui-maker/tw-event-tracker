@@ -1,7 +1,7 @@
 """早班：在台股開盤前寫下對加權指數的事前判斷（AI 與對照規則各一筆，寫入後不可修改）。"""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from psycopg.types.json import Jsonb
 
@@ -71,8 +71,13 @@ def baseline(conn, log, target: date, now: datetime) -> bool:
 def ai_prediction(conn, log, target: date, now: datetime, event_ids: list[str]) -> bool:
     if _exists(conn, "ai", target):
         return False
+    # 納入上一個交易日收盤之後分析的所有事件（週一會包含週末的事件）
+    prev = fetch_one(conn, "select max(trade_date) as d from index_daily where index_code = 'TAIEX' and trade_date < %s",
+                     (target,))
+    since = prev["d"] if prev and prev["d"] else now.date() - timedelta(days=1)
     events = fetch_all(conn, "select id, name, event_type, importance, direction, summary, pathway from events "
-                             "where analysis_date = %s order by importance desc", (now.date(),))
+                             "where analysis_date > %s and analysis_date <= %s order by importance desc, id limit 20",
+                       (since, now.date()))
     variables = latest_variables(conn, OVERNIGHT_VARIABLES)
     taiex = taiex_recent(conn)
     ev_text = "\n".join(f"{e['id']}｜{e['event_type']}｜重要程度 {e['importance']}｜對大盤可能方向：{e['direction']}｜"

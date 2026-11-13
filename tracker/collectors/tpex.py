@@ -23,8 +23,11 @@ def _swagger() -> tuple[str, dict]:
     return _cache["sw"]
 
 
-def find_endpoint(*keywords: str, exclude: tuple[str, ...] = ()) -> str | None:
+def find_endpoint(*keywords: str, exclude: tuple[str, ...] = (), prefer: str | None = None) -> str | None:
+    """依說明文字找端點；prefer 是實測確認過的路徑，存在就優先使用。"""
     base, sw = _swagger()
+    if prefer and prefer in sw.get("paths", {}):
+        return base + prefer
     for path, ops in sw.get("paths", {}).items():
         op = ops.get("get") or {}
         text = f"{op.get('summary', '')}{op.get('description', '')}"
@@ -43,7 +46,7 @@ def _pick(row: dict, *candidates: str):
 
 def stock_quotes() -> list[dict]:
     """上櫃股票每日收盤行情（最新一個交易日）。"""
-    url = find_endpoint("上櫃股票", "收盤行情", exclude=("權證", "債", "興櫃", "零股", "盤後定價")) \
+    url = find_endpoint("上櫃股票", "收盤行情", exclude=("權證", "債", "興櫃", "零股", "盤後定價"), prefer="/tpex_mainboard_quotes") \
         or find_endpoint("收盤行情", exclude=("權證", "債", "興櫃", "零股"))
     if not url:
         raise RuntimeError("在櫃買中心 API 說明文件中找不到上櫃收盤行情端點")
@@ -70,7 +73,7 @@ def stock_quotes() -> list[dict]:
 
 def index_latest() -> list[dict]:
     """櫃買指數（最新資料）。"""
-    url = find_endpoint("櫃買指數", exclude=("報酬", "權證", "債")) or find_endpoint("指數", "收盤", exclude=("報酬", "權證", "債"))
+    url = find_endpoint("櫃買指數", exclude=("報酬", "權證", "債", "成分股"), prefer="/tpex_index") or find_endpoint("指數", "收盤", exclude=("報酬", "權證", "債"))
     if not url:
         raise RuntimeError("在櫃買中心 API 說明文件中找不到櫃買指數端點")
     resp = http_get(url)

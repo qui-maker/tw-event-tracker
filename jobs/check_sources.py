@@ -28,6 +28,7 @@ import os
 import platform
 import sys
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -385,33 +386,33 @@ def gemini_check(r: Result) -> None:
     from google import genai
     client = genai.Client(api_key=key)
 
-    # 1. 列出可以用來產生文字的 Flash 系列模型
-    skip_words = ("image", "tts", "audio", "live", "embedding", "veo", "imagen")
-    names = []
-    for m in client.models.list():
-        actions = m.supported_actions or []
-        name = (m.name or "").replace("models/", "")
-        if "generateContent" in actions and "flash" in name and not any(w in name for w in skip_words):
-            names.append(name)
-    r.details.append(f"可用的 Flash 系列模型：{', '.join(sorted(names)) or '（沒有）'}")
+    # 1. 列出可用的 Flash 系列模型（與正式流程用同一個排序：正式版、非 lite、版本新的優先）
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from tracker.analysis.llm import gemini_candidates
+    names = gemini_candidates(client)
+    r.details.append(f"可用的 Flash 系列模型（依偏好排序）：{', '.join(names) or '（沒有）'}")
     if not names:
         r.status, r.summary = "⚠️", "金鑰有效，但找不到可用的 Flash 模型"
         return
 
-    # 2. 優先選正式版（名稱沒有 preview、exp），其次選非 lite，再選版本號最大的
-    def rank(n: str):
-        return ("preview" not in n and "exp" not in n, "lite" not in n, n)
-    model = sorted(names, key=rank)[-1]
-
-    # 3. 實際送一個小問題，檢查回傳是否為繁體中文 JSON
+    # 2. 依序試，直到有一個成功（最新的模型常因需求過高回 503）
     prompt = '請只回傳 JSON，不要加任何說明文字：{"語言": "繁體中文", "測試": "成功", "今天星期幾": "<用繁體中文回答>"}'
-    resp = client.models.generate_content(model=model, contents=prompt)
-    text = (resp.text or "").strip()
-    r.details.append(f"測試模型：{model}")
-    r.details.append(f"模型回覆：{short(text, 200)}")
-    r.status = "✅" if "成功" in text else "⚠️"
-    r.summary = f"使用 {model} 測試" + ("成功" if "成功" in text else "，回覆格式需要檢查")
-
+    ok_models = []
+    for model in names[:6]:
+        try:
+            text = (client.models.generate_content(model=model, contents=prompt).text or "").strip()
+            r.details.append(f"✅ {model}：{short(text, 120)}")
+            ok_models.append(model)
+            if len(ok_models) >= 2:
+                break
+        except Exception as e:  # noqa: BLE001
+            r.details.append(f"❌ {model}：{type(e).__name__}: {short(str(e), 160)}")
+        time.sleep(2)
+    if ok_models:
+        r.status = "✅"
+        r.summary = f"金鑰有效；可用模型：{', '.join(ok_models)}（正式流程會從排序第一個開始試）"
+    else:
+        r.status, r.summary = "❌", "金鑰有效，但測試的模型都暫時無法使用（多半是 503 需求過高，稍後再試）"
 
 
 # ──────────────────────────────────────────────────────────────
