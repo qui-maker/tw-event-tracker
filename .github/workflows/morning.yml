@@ -1,0 +1,27 @@
+name: 早班（國際新聞、AI 事件分析、事前判斷）
+on:
+  schedule:
+    - cron: "13 23 * * *"   # UTC 23:13 = 台北時間 07:13（美股收盤後、台股開盤前）
+  workflow_dispatch:
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      AI_PROVIDER: ${{ vars.AI_PROVIDER }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-jobs.txt
+      - run: pip install -r requirements-jobs.txt
+      - run: python -m jobs.morning

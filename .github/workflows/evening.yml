@@ -1,0 +1,33 @@
+name: 晚班（台股收盤、評估、日報）
+on:
+  schedule:
+    - cron: "17 10 * * *"   # UTC 10:17 = 台北時間 18:17（台股盤後資料公布後）
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 補跑指定日期（YYYY-MM-DD，留空＝今天）
+        default: ""
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      AI_PROVIDER: ${{ vars.AI_PROVIDER }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-jobs.txt
+      - run: pip install -r requirements-jobs.txt
+      - name: 執行晚班
+        run: |
+          if [ -n "${{ inputs.date }}" ]; then python -m jobs.evening --date "${{ inputs.date }}"; else python -m jobs.evening; fi

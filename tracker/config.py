@@ -1,0 +1,111 @@
+"""全專案共用的設定：時區、變項清單、新聞查詢主題、指數代碼。
+
+要新增追蹤的經濟變項，只要在 VARIABLES 加一列，下次排程就會自動開始蒐集。
+"""
+from zoneinfo import ZoneInfo
+
+TAIPEI = ZoneInfo("Asia/Taipei")
+
+# 提示詞與評估規則的版本號（改規則時一定要改版本號，舊結果會保留）
+PROMPT_VERSION = "p1"
+EVAL_METHOD_VERSION = "v1"
+
+# ─────────────────────────────────────────────
+# 經濟與市場變項
+#   source = "FRED"：官方資料（聖路易聯邦準備銀行）
+#   source = "Yahoo"：非官方（yfinance），只當備援，網站會標示
+# ─────────────────────────────────────────────
+VARIABLES = [
+    # code,        name,                    category,       unit,              freq, source,  series,      official
+    ("FED_RATE",  "聯邦基金利率目標上限",     "利率",          "%",               "日", "FRED",  "DFEDTARU",  True),
+    ("EFFR",      "有效聯邦基金利率",         "利率",          "%",               "日", "FRED",  "DFF",       True),
+    ("US2Y",      "美國 2 年期公債殖利率",    "利率",          "%",               "日", "FRED",  "DGS2",      True),
+    ("US10Y",     "美國 10 年期公債殖利率",   "利率",          "%",               "日", "FRED",  "DGS10",     True),
+    ("US_CPI",    "美國消費者物價指數",       "美國經濟數據",   "指數（1982-84=100）", "月", "FRED", "CPIAUCSL", True),
+    ("US_UNRATE", "美國失業率",              "美國經濟數據",   "%",               "月", "FRED",  "UNRATE",    True),
+    ("US_NFP",    "美國非農就業人數",         "美國經濟數據",   "千人",             "月", "FRED",  "PAYEMS",    True),
+    ("USD_BROAD", "廣義美元指數",            "匯率",          "指數（2006-01=100）", "日", "FRED", "DTWEXBGS", True),
+    ("USDTWD",    "新台幣兌美元",            "匯率",          "新台幣／美元",      "日", "FRED",  "DEXTAUS",   True),
+    ("WTI",       "WTI 原油",               "原物料",        "美元／桶",          "日", "FRED",  "DCOILWTICO", True),
+    ("BRENT",     "Brent 原油",             "原物料",        "美元／桶",          "日", "FRED",  "DCOILBRENTEU", True),
+    ("SPX",       "S&P 500 指數",           "國際股市",       "點",               "日", "FRED",  "SP500",     True),
+    ("NASDAQ",    "Nasdaq 綜合指數",         "國際股市",       "點",               "日", "FRED",  "NASDAQCOM", True),
+    ("SOX",       "費城半導體指數",           "國際股市",       "點",               "日", "Yahoo", "^SOX",      False),
+    ("TSM_ADR",   "台積電 ADR",              "國際股市",       "美元",             "日", "Yahoo", "TSM",       False),
+    ("NIKKEI",    "日經 225 指數",           "國際股市",       "點",               "日", "Yahoo", "^N225",     False),
+    ("VIX",       "VIX 波動率指數",          "國際股市",       "點",               "日", "Yahoo", "^VIX",      False),
+    ("DXY",       "美元指數 DXY",            "匯率",          "點",               "日", "Yahoo", "DX-Y.NYB",  False),
+    ("GOLD",      "黃金期貨",                "原物料",        "美元／盎司",        "日", "Yahoo", "GC=F",      False),
+]
+VARIABLE_CODES = [v[0] for v in VARIABLES]
+
+# 早班預測時提供給 AI 參考的隔夜變項
+OVERNIGHT_VARIABLES = ["SPX", "NASDAQ", "SOX", "TSM_ADR", "VIX", "US10Y", "US2Y", "DXY", "USD_BROAD", "WTI", "BRENT", "GOLD", "USDTWD"]
+
+# ─────────────────────────────────────────────
+# GDELT 新聞查詢（英文查詢；GDELT 會把 65 種語言的新聞翻譯後一起搜尋）
+# ─────────────────────────────────────────────
+GDELT_QUERIES = {
+    "貨幣政策": '("Federal Reserve" OR "interest rates" OR "central bank" OR inflation) sourcelang:english',
+    "國際貿易": '(tariff OR tariffs OR "trade war" OR "export controls" OR sanctions) sourcelang:english',
+    "地緣政治": '(war OR military OR missile OR ceasefire OR "Taiwan Strait") sourcelang:english',
+    "科技與半導體": '(semiconductor OR chipmaker OR TSMC OR Nvidia OR "artificial intelligence") sourcelang:english',
+    "能源與原物料": '("oil prices" OR OPEC OR crude OR "natural gas") sourcelang:english',
+    "主要經濟體": '("China economy" OR "European Central Bank" OR "Bank of Japan" OR yuan OR "Treasury yields") sourcelang:english',
+    "台灣": '(Taiwan OR TAIEX OR "Taiwan stocks") sourcelang:english',
+}
+GDELT_MAX_RECORDS = 75
+
+# ─────────────────────────────────────────────
+# 證交所指數名稱 → 本專案代碼（沒列到的類股指數會自動用「IDX:名稱」）
+# ─────────────────────────────────────────────
+INDEX_CODES = {
+    "發行量加權股價指數": "TAIEX",
+    "未含金融指數": "IDX_EXFIN",
+    "未含電子指數": "IDX_EXELEC",
+    "電子工業類指數": "IDX_ELEC",
+    "半導體類指數": "IDX_SEMI",
+    "電腦及週邊設備類指數": "IDX_COMP",
+    "光電類指數": "IDX_OPTO",
+    "通信網路類指數": "IDX_COMM",
+    "電子零組件類指數": "IDX_ECOMP",
+    "電子通路類指數": "IDX_EDIST",
+    "資訊服務類指數": "IDX_ITSVC",
+    "其他電子類指數": "IDX_OELEC",
+    "金融保險類指數": "IDX_FIN",
+    "航運類指數": "IDX_SHIP",
+    "塑膠類指數": "IDX_PLASTIC",
+    "鋼鐵類指數": "IDX_STEEL",
+    "油電燃氣類指數": "IDX_OIL",
+    "汽車類指數": "IDX_AUTO",
+    "建材營造類指數": "IDX_CONST",
+    "食品類指數": "IDX_FOOD",
+    "紡織纖維類指數": "IDX_TEXT",
+    "水泥類指數": "IDX_CEMENT",
+    "化學類指數": "IDX_CHEM",
+    "生技醫療類指數": "IDX_BIO",
+    "觀光餐旅類指數": "IDX_TOUR",
+    "貿易百貨類指數": "IDX_TRADE",
+    "電機機械類指數": "IDX_MACH",
+    "電器電纜類指數": "IDX_CABLE",
+    "玻璃陶瓷類指數": "IDX_GLASS",
+    "造紙類指數": "IDX_PAPER",
+    "橡膠類指數": "IDX_RUBBER",
+    "綠能環保類指數": "IDX_GREEN",
+    "數位雲端類指數": "IDX_CLOUD",
+    "運動休閒類指數": "IDX_SPORT",
+    "居家生活類指數": "IDX_HOME",
+    "其他類指數": "IDX_OTHER",
+}
+
+EVENT_TYPES = ["貨幣政策", "財政政策", "國際貿易", "地緣政治", "科技發展", "產業供需", "能源及原物料", "國際金融市場", "其他"]
+DIRECTIONS = ["正面", "負面", "中性", "不確定"]
+
+# 漲跌幅分級 v1（見 docs/決策紀錄.md）
+ABS_GRADE_THRESHOLDS = [0.5, 1.0, 2.0, 3.0]          # 單位 %
+ABS_GRADE_NAMES = {
+    1: ("微漲", "微跌"), 2: ("小漲", "小跌"), 3: ("明顯上漲", "明顯下跌"),
+    4: ("大漲", "大跌"), 5: ("暴漲", "重挫"),
+}
+REL_GRADE_THRESHOLDS = [(1.0, "正常"), (2.0, "偏大"), (2.5, "異常")]   # 以上皆非則為「極端」
+REL_WINDOW = 20
