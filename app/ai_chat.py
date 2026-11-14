@@ -280,7 +280,7 @@ def _config(model: str, system: str):
 
 def _retryable(msg: str) -> bool:
     return any(k in msg for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "500", "INTERNAL", "404", "NOT_FOUND",
-                                  "no longer available", "high demand"))
+                                  "no longer available", "high demand", "imeout", "timed out"))
 
 
 def answer_stream(question: str, history: list[dict], meta: dict) -> Iterator[str]:
@@ -301,7 +301,9 @@ def answer_stream(question: str, history: list[dict], meta: dict) -> Iterator[st
         yield "目前無法連線到 AI 服務（可能是金鑰設定有誤或服務暫時無法使用），請稍後再試。"
         return
     errors = []
+    print(f"[AI 問答] 參考資料 {len(system):,} 字；候選模型：{models}", flush=True)
     for model in models:
+        t0 = time.time()
         try:
             stream = client.models.generate_content_stream(model=model, contents=contents, config=_config(model, system))
             first = True
@@ -321,11 +323,14 @@ def answer_stream(question: str, history: list[dict], meta: dict) -> Iterator[st
             if meta.get("model") == model:  # 已經開始輸出才失敗，就不要換模型重講
                 yield "\n\n（回答中斷，請再問一次。）"
                 return
-            errors.append(f"{model}：{msg[:80]}")
+            errors.append(f"{model}（{time.time() - t0:.0f} 秒）：{type(e).__name__}: {msg[:160]}")
+            print(f"[AI 問答] {errors[-1]}", flush=True)
             if not _retryable(msg):
                 break
     meta["error"] = "；".join(errors[-3:])
-    yield "目前 AI 服務忙碌或無法使用，請稍後再試。"
+    code = re.search(r"\b(4\d\d|5\d\d)\b", meta["error"])
+    yield ("目前 AI 服務忙碌或無法使用，請稍後再試。"
+           + (f"（錯誤代碼 {code.group(1)}）" if code else "（連線逾時）" if "imeout" in meta["error"] else ""))
 
 
 # ─────────────────────────────────────────────
