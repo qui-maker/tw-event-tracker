@@ -157,7 +157,7 @@ if rep is not None:
                                     v["change"] if pts else None, None if pts else v["change_pct"], var_note(code),
                                     unit_points="個百分點" if pts else None))
         if items:
-            ui.kpi_grid(items)
+            ui.kpi_grid(items, compact=True)
 
     # 2-2 主要影響因素 ｜ 2-3 可能受影響的產業
     b1, b2 = st.columns(2, gap="large")

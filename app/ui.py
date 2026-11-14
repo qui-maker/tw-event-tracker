@@ -77,6 +77,8 @@ p, li {{font-size: .95rem; line-height: 1.65;}}
 .kpi .v small {{font-size:.8rem; font-weight:500; color:{MUTED}; margin-left:3px;}}
 .kpi .d {{font-size:.85rem; font-weight:600; font-variant-numeric: tabular-nums;}}
 .kpi .n {{font-size:.75rem; color:{MUTED}; margin-top:4px; line-height:1.4;}}
+.kpis.compact .kpi .v {{font-size:1.15rem;}}
+.kpis.compact .kpi {{padding:10px 12px;}}
 
 /* 卡片：st.container(border=True, key="card-...") 會帶 st-key-card-... 這個 class */
 [class*="st-key-card"] {{border-color:{BORDER} !important; border-radius:12px !important; background:#fff;}}
@@ -222,8 +224,8 @@ def kpi(label: str, value, unit: str = "", digits: int = 2, delta=None, pct=None
             + (f'<div class="n">{note}</div>' if note else "") + "</div>")
 
 
-def kpi_grid(items: list[str]):
-    st.markdown(f'<div class="kpis">{"".join(items)}</div>', unsafe_allow_html=True)
+def kpi_grid(items: list[str], compact: bool = False):
+    st.markdown(f'<div class="kpis{" compact" if compact else ""}">{"".join(items)}</div>', unsafe_allow_html=True)
 
 
 def source_line(source: str | None, when=None, unofficial: bool = False) -> str:
