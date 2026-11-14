@@ -266,19 +266,21 @@ def _client_and_models():
     return client, sorted(names, key=rank, reverse=True)[:8]
 
 
-def _config(model: str, system: str):
-    """問答不需要長時間「思考」：Gemini 3 以後的模型把思考程度設為低，回應快很多，
-    也避免思考用掉輸出額度而沒有文字（11/14 實測：預設設定下等超過 2 分鐘沒有回應）。"""
+def _configs(model: str, system: str) -> list:
+    """問答不需要長時間「思考」。依序嘗試較低的思考程度：不同模型支援的程度不同
+    （11/14 實測：預設設定等超過 2 分鐘沒有回應；gemini-3.8-flash 不支援 MINIMAL，會回 400）。"""
     from google.genai import types
+
+    def cfg(thinking):
+        return types.GenerateContentConfig(system_instruction=system, temperature=0.3, max_output_tokens=4096,
+                                           thinking_config=thinking)
     major = re.match(r"gemini-(\d+)", model)
-    thinking = None
     if major and int(major.group(1)) >= 3:
-        thinking = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL if "lite" not in model
-                                        else types.ThinkingLevel.LOW)
-    elif "2.5" in model:
-        thinking = types.ThinkingConfig(thinking_budget=0 if "lite" in model or "flash" in model else 512)
-    return types.GenerateContentConfig(system_instruction=system, temperature=0.3, max_output_tokens=4096,
-                                       thinking_config=thinking)
+        return [cfg(types.ThinkingConfig(thinking_level=lv)) for lv in
+                (types.ThinkingLevel.MINIMAL, types.ThinkingLevel.LOW)]
+    if "2.5" in model:
+        return [cfg(types.ThinkingConfig(thinking_budget=0)), cfg(None)]
+    return [cfg(None)]
 
 
 def _retryable(msg: str) -> bool:
@@ -306,31 +308,38 @@ def answer_stream(question: str, history: list[dict], meta: dict) -> Iterator[st
     errors = []
     print(f"[AI 問答] 參考資料 {len(system):,} 字；候選模型：{models}", flush=True)
     for model in models:
-        t0 = time.time()
-        try:
-            stream = client.models.generate_content_stream(model=model, contents=contents, config=_config(model, system))
-            first = True
-            for chunk in stream:
-                text = getattr(chunk, "text", None) or ""
-                if first:
-                    meta["model"] = model
-                    first = False
-                    print(f"[AI 問答] {model} 開始回答（{time.time() - t0:.0f} 秒）", flush=True)
-                if text:
-                    yield text
-            if first:  # 沒有任何內容
-                errors.append(f"{model}：沒有回應內容")
-                continue
-            return
-        except Exception as e:  # noqa: BLE001
-            msg = str(e)
-            if meta.get("model") == model:  # 已經開始輸出才失敗，就不要換模型重講
-                yield "\n\n（回答中斷，請再問一次。）"
+        configs = _configs(model, system)
+        for i, config in enumerate(configs):
+            t0 = time.time()
+            try:
+                stream = client.models.generate_content_stream(model=model, contents=contents, config=config)
+                first = True
+                for chunk in stream:
+                    text = getattr(chunk, "text", None) or ""
+                    if first:
+                        meta["model"] = model
+                        first = False
+                        print(f"[AI 問答] {model} 開始回答（{time.time() - t0:.0f} 秒）", flush=True)
+                    if text:
+                        yield text
+                if first:  # 沒有任何內容
+                    errors.append(f"{model}：沒有回應內容")
+                    break
                 return
-            errors.append(f"{model}（{time.time() - t0:.0f} 秒）：{type(e).__name__}: {msg[:160]}")
-            print(f"[AI 問答] {errors[-1]}", flush=True)
-            if not _retryable(msg):
-                break
+            except Exception as e:  # noqa: BLE001
+                msg = str(e)
+                if meta.get("model") == model:  # 已經開始輸出才失敗，就不要換模型重講
+                    yield "\n\n（回答中斷，請再問一次。）"
+                    return
+                errors.append(f"{model}（{time.time() - t0:.0f} 秒）：{type(e).__name__}: {msg[:160]}")
+                print(f"[AI 問答] {errors[-1]}", flush=True)
+                if ("400" in msg or "INVALID_ARGUMENT" in msg) and "hinking" in msg and i + 1 < len(configs):
+                    continue  # 這個模型不支援這個思考程度：同一個模型換下一個設定
+                if not _retryable(msg):
+                    meta["error"] = "；".join(errors[-3:])
+                    yield f"目前 AI 服務無法使用，請稍後再試。（錯誤：{msg[:60]}）"
+                    return
+                break  # 換下一個模型
     meta["error"] = "；".join(errors[-3:])
     code = re.search(r"\b(4\d\d|5\d\d)\b", meta["error"])
     yield ("目前 AI 服務忙碌或無法使用，請稍後再試。"

@@ -27,6 +27,8 @@ class FakeModels:
                            "thinking": config.thinking_config})
         if self.fail_first and model == "gemini-3.8-flash":
             raise RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
+        if model == "gemini-3.7-flash" and str(config.thinking_config.thinking_level).endswith("MINIMAL"):
+            raise RuntimeError("400 INVALID_ARGUMENT. Thinking level MINIMAL is not supported for this model.")
         for piece in ["【事實】測試回答：", "加權指數上漲。"]:
             yield pytypes.SimpleNamespace(text=piece)
 
@@ -82,13 +84,16 @@ def test_ask_page_answers_from_database(seeded, fake_gemini):
 
 
 def test_follow_up_keeps_history_and_falls_back_on_busy_model(seeded, fake_gemini):
-    fake_gemini["fail_first"] = True
+    fake_gemini["fail_first"] = True  # 3.8 忙碌 → 3.7 不支援 MINIMAL → 3.7 用 LOW 成功
     at = run_page("pages/ask.py")
     at.chat_input(key="qa_input_page").set_value("第一題").run()
     at.chat_input(key="qa_input_page").set_value("第二題").run()
     assert not errors(at), errors(at)
     models = [c["model"] for c in fake_gemini["list"]]
     assert "gemini-3.7-flash" in models, "最新模型忙碌時要改用下一個"
+    levels = [str(c["thinking"].thinking_level) for c in fake_gemini["list"] if c["model"] == "gemini-3.7-flash"]
+    assert any(lv.endswith("LOW") for lv in levels), "不支援 MINIMAL 時要改用 LOW"
+    assert any("測試回答" in m.value for m in at.markdown)
     last = fake_gemini["list"][-1]["contents"]
     assert [c["parts"][0]["text"] for c in last if c["role"] == "user"][-2:] == ["第一題", "第二題"]
 
