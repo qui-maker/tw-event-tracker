@@ -28,7 +28,7 @@ if sel == "（總覽）":
         cols = st.columns(4)
         for i, (_, v) in enumerate(g.iterrows()):
             with cols[i % 4]:
-                ui.metric(v["name"], v["value"], None, v["change_pct"], help=f"單位：{v['unit']}；頻率：{v['frequency']}")
+                ui.var_metric(v["name"], v, help=f"單位：{v['unit']}；頻率：{v['frequency']}")
                 st.markdown(ui.source_line(v["source"], v["date"], unofficial=not bool(v["is_official"])), unsafe_allow_html=True)
     st.stop()
 
@@ -40,7 +40,7 @@ st.markdown(ui.tag(v["category"]) + ui.tag(f"頻率：{v['frequency']}") + ui.ta
 
 k = st.columns(3)
 with k[0]:
-    ui.metric("最新數據", v["value"], None, v["change_pct"])
+    ui.var_metric("最新數據", v)
 with k[1]:
     st.markdown(f"**數據日期**<br>{v['date']:%Y-%m-%d}", unsafe_allow_html=True)
 with k[2]:

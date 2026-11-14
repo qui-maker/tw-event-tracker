@@ -39,7 +39,7 @@ class EventOut(BaseModel):
     unconfirmed: list[str]
     data_gaps: list[str] = Field(description="判斷這個事件時缺少的資料")
     affected_variables: list[str] = Field(description="可能受影響的變項代碼，只能從提供的清單選")
-    affected_industries: list[str] = Field(description="可能受影響的台灣產業（繁體中文）")
+    affected_industries: list[str] = Field(description="可能受影響的台灣產業，只能從提供的「證交所類股清單」選，最多 5 個")
     direction: str = Field(description="對台股大盤的可能方向：正面、負面、中性、不確定")
     pathway: list[str] = Field(description="傳導路徑 3～5 個節點，第一個是事件，最後一個是「台股加權指數」")
     news_ids: list[int] = Field(description="與此事件有關的全部新聞編號")
@@ -61,6 +61,9 @@ EVENTS_TASK = """以下是過去約 24 小時蒐集到的新聞標題（JSON，�
 
 可用的變項代碼：
 {variables}
+
+證交所類股清單（affected_industries 只能從這裡選）：
+{industries}
 
 近期已記錄事件：
 {recent}

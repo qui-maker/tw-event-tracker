@@ -69,7 +69,7 @@ else:
     for i, code in enumerate([s for s in show if s in lv.index]):
         v = lv.loc[code]
         with cols[i % 5]:
-            ui.metric(f"{v['name']}", v["value"], None, v["change_pct"], help=f"單位：{v['unit']}")
+            ui.var_metric(f"{v['name']}", v, help=f"單位：{v['unit']}")
             st.markdown(ui.source_line(v["source"], v["date"], unofficial=not bool(v.get("is_official", True))),
                         unsafe_allow_html=True)
 
@@ -101,7 +101,7 @@ with right:
     st.subheader("AI 今日市場分析")
     reps = data.reports("daily")
     if reps.empty:
-        ui.empty_state("還沒有日報。晚班（約 18:20）完成後會產生。")
+        ui.empty_state("還沒有日報。晚班（約台北 18:30～19:30）完成後會產生。")
     else:
         r = reps.iloc[0]
         s = r["sections"] or {}

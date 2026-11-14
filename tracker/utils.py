@@ -108,3 +108,13 @@ def daterange(start: date, end: date):
     while d <= end:
         yield d
         d += timedelta(days=1)
+
+
+def change_text(value, prev, unit: str | None) -> str:
+    """變項的「較前一筆」：單位是 % 的（利率、殖利率、失業率）用個百分點，其他用變化率。"""
+    if value is None or prev is None:
+        return "—"
+    value, prev = float(value), float(prev)
+    if unit and unit.strip().startswith("%"):
+        return f"{value - prev:+.2f} 個百分點"
+    return "—" if prev == 0 else f"{(value / prev - 1) * 100:+.2f}%"

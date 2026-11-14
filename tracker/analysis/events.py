@@ -9,7 +9,7 @@ from psycopg.types.json import Jsonb
 
 from tracker.analysis.llm import generate_json
 from tracker.analysis.prompts import COMMON_RULES, EVENTS_TASK, EventsOut
-from tracker.config import DIRECTIONS, EVENT_TYPES, PROMPT_VERSION, TAIPEI, VARIABLES
+from tracker.config import DIRECTIONS, EVENT_TYPES, INDUSTRIES, PROMPT_VERSION, TAIPEI, VARIABLES, normalize_industry
 from tracker.db import fetch_all, fetch_one, insert_ignore
 
 MAX_NEWS = 180
@@ -51,7 +51,8 @@ def analyze(conn, log, today: date) -> list[str]:
                        (today,))
     variables = "\n".join(f"{c}：{n}" for c, n, *_ in VARIABLES)
     recent_text = "\n".join(f"{e['id']}（{e['analysis_date']}）{e['name']}" for e in recent) or "（無）"
-    prompt = EVENTS_TASK.format(variables=variables, recent=recent_text, today=today.isoformat(),
+    prompt = EVENTS_TASK.format(variables=variables, industries="、".join(INDUSTRIES), recent=recent_text,
+                                today=today.isoformat(),
                                 news="\n".join(_news_line(r) for r in news))
     out, model = generate_json(prompt, EventsOut, COMMON_RULES)
 
@@ -90,7 +91,7 @@ def analyze(conn, log, today: date) -> list[str]:
             "facts": Jsonb(facts), "inferences": Jsonb(ev.inferences), "unconfirmed": Jsonb(unconfirmed),
             "data_gaps": Jsonb(ev.data_gaps),
             "affected_variables": [v for v in ev.affected_variables if v in codes],
-            "affected_industries": [i for i in ev.affected_industries if i][:10],
+            "affected_industries": list(dict.fromkeys(x for x in (normalize_industry(i) for i in ev.affected_industries) if x))[:5],
             "affected_stocks": [],  # 第一版研究範圍是大盤，不做個股
             "pathway": Jsonb(ev.pathway[:6]), "model": model, "prompt_version": PROMPT_VERSION,
         }

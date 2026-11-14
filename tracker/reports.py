@@ -118,7 +118,7 @@ def build_daily(conn, log, d: date) -> int | None:
     md += ["## 3. 今日重要經濟變項變化", "", "| 變項 | 最新值 | 日期 | 較前一筆 | 來源 |", "|---|---|---|---|---|"]
     for v in variables:
         md.append(f"| {v['name']} | {_fmt(v['value'])} {v['unit']} | {v['date']} | "
-                  f"{'—' if v['change_pct'] is None else f'{v['change_pct']:+.2f}%'} | {v['source']} |")
+                  f"{v['change_text']} | {v['source']} |")
     md.append("")
 
     # 4、5. 產業與公司
@@ -151,14 +151,14 @@ def build_daily(conn, log, d: date) -> int | None:
 
     # AI 文字段落
     context = json.dumps({
-        "台股": None if not tx else {"收盤": float(tx["close"]), "漲跌幅%": float(tx["change_pct"]), "等級": tx["grade_label"],
+        "台股": None if not tx else {"收盤": float(tx["close"]), "漲跌幅%": round(float(tx["change_pct"]), 2), "等級": tx["grade_label"],
                                      "相對波動": tx["rel_label"]},
         "上漲下跌家數": None if not breadth else {"上漲": breadth["advances"], "下跌": breadth["declines"]},
         "三大法人淨額(億元)": {f["investor"]: round(float(f["net"]) / 1e8, 2) for f in flows if f["net"] is not None},
         "類股": [{s["name"]: float(s["change_pct"])} for s in sectors[:5] + sectors[-5:]],
         "事件": [{"編號": e["id"], "名稱": e["name"], "類型": e["event_type"], "重要程度": e["importance"],
                   "摘要": e["summary"], "方向": e["direction"]} for e in events],
-        "經濟變項": [{v["name"]: v["value"], "日期": v["date"], "變化%": v["change_pct"]} for v in variables],
+        "經濟變項": [{v["name"]: v["value"], "日期": v["date"], "較前一筆": v["change_text"]} for v in variables],
         "事前判斷": [{"判斷者": p["kind"], "目標日": str(p["target_trading_day"]), "方向": p["direction"],
                       "結果": p.get("result")} for p in preds + next_preds],
     }, ensure_ascii=False, default=str)

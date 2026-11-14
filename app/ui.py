@@ -93,8 +93,22 @@ def sources_of(df: pd.DataFrame, col: str = "source") -> str:
     return "、".join(dict.fromkeys(str(x) for x in df[col].dropna()))
 
 
-def metric(label: str, value, delta=None, delta_pct=None, unit: str = "", digits: int = 2, help: str | None = None):
+def var_metric(label: str, v, help: str | None = None):
+    """經濟變項的指標卡：單位是 % 的（利率、殖利率、失業率）變化用「個百分點」，其他用變化率。"""
+    if str(v.get("unit") or "").startswith("%"):
+        d = v.get("change")
+        metric(label, v["value"], help=help, delta_text=None if not is_num(d) else f"{d:+.2f} 個百分點")
+    else:
+        metric(label, v["value"], None, v.get("change_pct"), help=help)
+
+
+def metric(label: str, value, delta=None, delta_pct=None, unit: str = "", digits: int = 2, help: str | None = None,
+           delta_text: str | None = None):
     """台股慣例：漲紅跌綠（Streamlit 的 inverse 模式剛好是正值紅、負值綠）。"""
+    if delta_text is not None:
+        st.metric(label, fmt(value, digits) + (f" {unit}" if unit and is_num(value) else ""), delta_text,
+                  delta_color="inverse", help=help)
+        return
     delta_text = None
     if is_num(delta) or is_num(delta_pct):
         delta_text = " ".join(x for x in [fmt(delta, digits, signed=True) if is_num(delta) else "",

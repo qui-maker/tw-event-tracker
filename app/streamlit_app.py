@@ -16,6 +16,6 @@ nav = st.navigation(pages, position="top")
 with st.sidebar:
     st.markdown("### 台股與世界重大事件追蹤器")
     st.caption("研究與資料分析工具，不是投資建議。AI 的判斷是事前推論，相關不等於因果。")
-    st.caption("資料每天自動更新兩次：台北時間約 07:15（國際）、18:20（台股收盤）。")
+    st.caption("資料每天自動更新兩次：台北時間約 06:00～07:00（國際新聞與 AI 開盤前判斷）、18:30～19:30（台股收盤）。實際時間依 GitHub 排程而定。")
 
 nav.run()

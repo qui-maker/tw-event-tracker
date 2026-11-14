@@ -188,7 +188,8 @@ def latest_variables() -> pd.DataFrame:
         out.append({"code": code, "date": cur["obs_date"], "value": cur["value"], "source": cur["source"],
                     "source_url": cur["source_url"], "fetched_at": cur["fetched_at"],
                     "prev_value": None if prev is None else prev["value"],
-                    "change_pct": None if prev is None or not prev["value"] else (cur["value"] / prev["value"] - 1) * 100})
+                    "change_pct": None if prev is None or not prev["value"] else (cur["value"] / prev["value"] - 1) * 100,
+                    "change": None if prev is None else cur["value"] - prev["value"]})
     defs = variables()
     res = pd.DataFrame(out)
     if defs.empty:

@@ -10,6 +10,7 @@ from tracker.analysis.llm import generate_json
 from tracker.analysis.prompts import COMMON_RULES, PREDICTION_TASK, PredictionOut
 from tracker.calendar import market_open
 from tracker.config import OVERNIGHT_VARIABLES, PROMPT_VERSION
+from tracker.utils import change_text
 from tracker.db import fetch_all, fetch_one, insert_ignore
 
 
@@ -29,6 +30,8 @@ def latest_variables(conn, codes: list[str]) -> list[dict]:
         out.append({"code": code, "name": cur["name"], "date": cur["obs_date"].isoformat(), "value": float(cur["value"]),
                     "unit": cur["unit"], "prev_date": prev["obs_date"].isoformat() if prev else None,
                     "change_pct": round(chg, 3) if chg is not None else None,
+                    "prev_value": float(prev["value"]) if prev else None,
+                    "change_text": change_text(cur["value"], prev["value"] if prev else None, cur["unit"]),
                     "official": bool(cur["is_official"]), "source": cur["source"]})
     return out
 
@@ -83,7 +86,7 @@ def ai_prediction(conn, log, target: date, now: datetime, event_ids: list[str]) 
     ev_text = "\n".join(f"{e['id']}｜{e['event_type']}｜重要程度 {e['importance']}｜對大盤可能方向：{e['direction']}｜"
                         f"{e['name']}｜{e['summary']}｜路徑：{' → '.join(e['pathway'] or [])}" for e in events) or "（今天沒有辨識出重大事件）"
     var_text = "\n".join(f"{v['code']} {v['name']}：{v['value']} {v['unit']}（{v['date']}），較前一筆 "
-                         f"{'—' if v['change_pct'] is None else f'{v['change_pct']:+.2f}%'}"
+                         f"{v['change_text']}"
                          f"{'' if v['official'] else '（非官方）'}" for v in variables) or "（無資料）"
     tx_text = "\n".join(f"{t['date']}：{t['close']}（{'—' if t['change_pct'] is None else f'{t['change_pct']:+.2f}%'}，{t['grade'] or ''}）"
                         for t in taiex) or "（無資料）"

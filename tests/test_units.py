@@ -83,3 +83,19 @@ def test_gemini_falls_back_when_model_overloaded(monkeypatch):
     assert obj.ok and model == "gemini-3.7-flash"
     assert calls == ["gemini-3.8-flash"] * 2 + ["gemini-3.7-flash"]
     assert llm.gemini_candidates(None)[:3] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite"]
+
+
+def test_industry_names_follow_twse_sectors():
+    from tracker.config import INDUSTRIES, normalize_industry
+    assert "半導體" in INDUSTRIES and INDUSTRIES["半導體"] == "IDX_SEMI"
+    assert normalize_industry("晶圓代工") == "半導體"
+    assert normalize_industry("金融保險業") == "金融保險"
+    assert normalize_industry("航運類") == "航運"
+    assert normalize_industry("太空旅遊") is None
+
+
+def test_change_text_uses_points_for_rates():
+    from tracker.utils import change_text
+    assert change_text(5.10, 4.98, "%") == "+0.12 個百分點"
+    assert change_text(110, 100, "點") == "+10.00%"
+    assert change_text(1, None, "%") == "—"
