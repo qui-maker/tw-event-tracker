@@ -1,5 +1,13 @@
 """網站入口。執行：streamlit run app/streamlit_app.py"""
+import sys
+from pathlib import Path
+
 import streamlit as st
+
+# 讓網站可以讀取 tracker/config.py 的共用設定（例如證交所類股清單）；網站不會執行任何寫入程式
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 st.set_page_config(page_title="台股與世界重大事件追蹤器", page_icon="📈", layout="wide")
 

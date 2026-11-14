@@ -128,6 +128,14 @@ def indices_on(d: date) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=CACHE_TTL)
+def sector_dates(start: date) -> list[date]:
+    """有類股指數資料的交易日（新到舊）。類股資料從系統上線那天開始累積。"""
+    df = select("index_daily", "trade_date", (("index_code", "eq", "IDX_SEMI"), ("trade_date", "gte", start.isoformat())),
+                order="trade_date", desc=True)
+    return [] if df.empty else [pd.to_datetime(x).date() for x in df["trade_date"]]
+
+
+@st.cache_data(ttl=CACHE_TTL)
 def breadth(start: date) -> pd.DataFrame:
     return _dates(select("market_breadth", filters=(("trade_date", "gte", start.isoformat()),), order="trade_date"), "trade_date")
 
@@ -217,6 +225,22 @@ def event_news(event_id: str) -> pd.DataFrame:
         return pd.DataFrame()
     return _dates(select("news", filters=(("id", "in", [int(i) for i in links["news_id"]]),), order="published_at"),
                   "published_at", "fetched_at")
+
+
+@st.cache_data(ttl=CACHE_TTL)
+def news_for_events(event_ids: tuple[str, ...]) -> pd.DataFrame:
+    """一次取回多則事件的原始新聞（event_id、標題、網址、媒體、發布時間）。"""
+    if not event_ids:
+        return pd.DataFrame()
+    links = select("event_news", "event_id, news_id", (("event_id", "in", list(event_ids)),))
+    if links.empty:
+        return pd.DataFrame()
+    nw = select("news", "id, title, url, source_name, published_at, collector",
+                (("id", "in", sorted({int(i) for i in links["news_id"]})),))
+    if nw.empty:
+        return pd.DataFrame()
+    out = links.merge(nw, left_on="news_id", right_on="id", how="inner")
+    return _dates(out, "published_at").sort_values(["event_id", "published_at"])
 
 
 @st.cache_data(ttl=CACHE_TTL)

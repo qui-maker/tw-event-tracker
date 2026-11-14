@@ -6,6 +6,7 @@ import streamlit as st
 
 import data
 import ui
+from groups import NOT_COLLECTED, VARIABLE_GROUPS, digits_for
 
 ui.setup_page("國際經濟變項", "官方數據來自聯準會經濟資料庫 FRED；費半、台積電 ADR、日經、VIX、DXY、黃金來自 Yahoo Finance（非官方，可能缺漏）。")
 if data.backend() == "none":
@@ -23,13 +24,22 @@ sel = st.selectbox("選擇變項看獨立頁面", ["（總覽）"] + codes, inde
 
 if sel == "（總覽）":
     st.query_params.pop("var", None)
-    for cat, g in lv.sort_values("display_order").groupby("category", sort=False):
-        st.markdown(f"#### {cat}")
-        cols = st.columns(4)
-        for i, (_, v) in enumerate(g.iterrows()):
-            with cols[i % 4]:
-                ui.var_metric(v["name"], v, help=f"單位：{v['unit']}；頻率：{v['frequency']}")
-                st.markdown(ui.source_line(v["source"], v["date"], unofficial=not bool(v["is_official"])), unsafe_allow_html=True)
+    # 與首頁相同的五個分類；指標卡用統一的設計（數值、變化、來源、資料日期）
+    by_code = lv.set_index("code")
+    for group, gcodes in VARIABLE_GROUPS.items():
+        ui.section(group)
+        tiles = []
+        for code in gcodes:
+            if code not in by_code.index:
+                tiles.append(ui.kpi(code, None, value_text=ui.missing()))
+                continue
+            v = by_code.loc[code]
+            pts = str(v["unit"]).startswith("%")
+            note = f"{v['source']}・{ui.date_str(v['date'])}・{v['frequency']}資料" + ("・非官方" if not bool(v["is_official"]) else "")
+            tiles.append(ui.kpi(v["name"], v["value"], v["unit"], digits_for(v["value"]), v["change"] if pts else None,
+                                None if pts else v["change_pct"], note, unit_points="個百分點" if pts else None))
+        tiles += [ui.kpi(name, None, value_text=ui.missing(), note="尚未納入蒐集") for name in NOT_COLLECTED.get(group, [])]
+        ui.kpi_grid(tiles)
     st.stop()
 
 st.query_params["var"] = sel

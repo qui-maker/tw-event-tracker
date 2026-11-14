@@ -98,3 +98,28 @@ def test_empty_database_shows_guidance(seeded):
             assert not errors(at), (page, errors(at))
     finally:
         mp.undo()
+
+
+def test_dashboard_sections_and_cards(seeded):
+    """首頁改版後的五個區塊、AI 分析五塊與事件卡片都要出現，而且用的是資料庫裡的資料。"""
+    at = run_page("pages/dashboard.py")
+    assert not errors(at), errors(at)
+    html = "\n".join(m.value for m in at.markdown)
+    for title in ["台股市場概況", "AI 今日市場分析", "今日國際重大事件 TOP 5", "值得持續追蹤", "市場數據圖表",
+                  "① 今日市場概況", "② 今日主要影響因素", "③ 可能受到影響的產業", "④ 值得觀察的經濟變項",
+                  "⑤ 不確定因素與分析限制", "產業表現排行", "國際經濟變項", "變項趨勢比較"]:
+        assert title in html, f"首頁缺少：{title}"
+    assert "測試事件" in html                      # 事件卡片來自資料庫
+    assert "查看完整分析" in [e.label for e in at.expander]
+    assert len(at.get("plotly_chart")) >= 5        # 加權指數、漲跌幅、類股、變項、比較
+
+
+def test_dashboard_controls(seeded):
+    """觀察期間、變項分類、類股全部顯示、比較變項都可以操作，而且不會出錯。"""
+    at = run_page("pages/dashboard.py")
+    at.toggle(key="sec_all").set_value(True).run()
+    assert not errors(at), errors(at)
+    at.selectbox(key="var_period").set_value("1 年").run()
+    assert not errors(at), errors(at)
+    at.multiselect(key="cmp_vars").set_value(["SOX", "WTI"]).run()
+    assert not errors(at), errors(at)
