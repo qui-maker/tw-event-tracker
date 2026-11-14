@@ -76,8 +76,8 @@ tiles = [
            note=f"相對近 20 日：{rel_label(z)}" + ("" if z is None else f"（{z:+.1f} 個標準差）") + "・依決策紀錄 v1"),
     ui.kpi("成交金額", today_row["trade_value"] / 1e8 if ui.is_num(today_row["trade_value"]) else None, "億元", 0, note=tx_note),
     ui.kpi("上漲／下跌／持平", None, value_text=ui.missing() if b.empty else
-           f'<span style="color:{ui.UP}">{int(b.iloc[0]["advances"])}</span>／'
-           f'<span style="color:{ui.DOWN}">{int(b.iloc[0]["declines"])}</span>／{int(b.iloc[0]["unchanged"] or 0)}',
+           f'<span style="font-size:1.2rem"><span style="color:{ui.UP}">{int(b.iloc[0]["advances"])}</span>／'
+           f'<span style="color:{ui.DOWN}">{int(b.iloc[0]["declines"])}</span>／{int(b.iloc[0]["unchanged"] or 0)}</span>',
            note="上市股票家數" + ("" if b.empty else f"・{b.iloc[0]['source']}")),
     ui.kpi("外資買賣超", None if f.empty else f["net"].sum() / 1e8, "億元", 2,
            value_text=ui.missing() if f.empty else None, note="" if f.empty else f"{f.iloc[0]['source']}・{last:%Y-%m-%d}"),
