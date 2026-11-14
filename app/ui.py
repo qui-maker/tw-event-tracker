@@ -342,7 +342,8 @@ def sector_bars(df: pd.DataFrame, label: str, value: str, height: int | None = N
         textfont=dict(size=11, color=INK), hovertemplate="%{y}：%{x:+.2f}%<extra></extra>"))
     fig = base_layout(fig, height or max(260, 26 * len(d) + 60), title)
     fig.update_layout(hovermode="closest", showlegend=False, bargap=0.28, margin=dict(l=8, r=40, t=36 if title else 8, b=8))
-    fig.update_yaxes(autorange="reversed", gridcolor="rgba(0,0,0,0)", tickfont=dict(size=12), automargin=True)
+    fig.update_yaxes(autorange="reversed", gridcolor="rgba(0,0,0,0)", tickfont=dict(size=12), automargin=True,
+                     tickmode="array", tickvals=list(d[label]), ticktext=list(d[label]))  # 每個產業名稱都要顯示
     fig.update_xaxes(gridcolor=GRID, ticksuffix="%", tickformat="+.1f", zeroline=True, zerolinecolor="#9aa3ae",
                      range=[-span * 1.35 if vals.min() < 0 else -span * 0.08, span * 1.35 if vals.max() > 0 else span * 0.08])
     return fig

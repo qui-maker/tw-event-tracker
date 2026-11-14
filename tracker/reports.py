@@ -152,6 +152,7 @@ def build_daily(conn, log, d: date) -> int | None:
     # AI 文字段落
     context = json.dumps({
         "台股": None if not tx else {"收盤": float(tx["close"]), "漲跌幅%": round(float(tx["change_pct"]), 2), "等級": tx["grade_label"],
+                                     "成交金額(億元)": None if tx.get("trade_value") is None else round(float(tx["trade_value"]) / 1e8, 2),
                                      "相對波動": tx["rel_label"]},
         "上漲下跌家數": None if not breadth else {"上漲": breadth["advances"], "下跌": breadth["declines"]},
         "三大法人淨額(億元)": {f["investor"]: round(float(f["net"]) / 1e8, 2) for f in flows if f["net"] is not None},
