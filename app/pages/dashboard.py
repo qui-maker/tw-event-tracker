@@ -199,8 +199,10 @@ if rep is not None:
                     act_html = ui.change_html(None, act) if ui.is_num(act) else ui.missing("類股資料")
                     dirs = Counter(d for _, _, d in evs)
                     reason = "；".join(f"{ui.esc(nm)}" for _, nm, _ in evs[:2]) + (f" 等 {len(evs)} 則" if len(evs) > 2 else "")
-                    rows.append(f"<li><b>{ui.esc(name)}</b>　<span class='src'>AI 判斷方向：{'、'.join(f'{k} {v}' for k, v in dirs.items())}"
-                                f"｜{rep_day:%m/%d} 類股實際：</span>{act_html}<br><span class='src'>判斷依據（事件）：{reason}</span></li>")
+                    dir_html = "".join(ui.direction_tag(k) + (f"<span class='src'>×{v}</span> " if v > 1 else " ") for k, v in dirs.items())
+                    rows.append(f"<li><div class='ind'><b>{ui.esc(name)}</b><span class='src'>{rep_day:%m/%d} 類股實際 {act_html}</span></div>"
+                                f"<div><span class='src'>AI 判斷：</span>{dir_html}</div>"
+                                f"<div class='src'>依據事件：{reason}</div></li>")
                 st.markdown("<ul class='items'>" + "".join(rows) + "</ul>", unsafe_allow_html=True)
                 st.markdown("<div class='src'>AI 判斷屬於【推論】；類股實際漲跌來自證交所 MI_INDEX，同日變化不代表因果。"
                             + (f"另有 {unmatched} 項早期寫法無法對應證交所類股，未列出。" if unmatched else "") + "</div>",
@@ -231,7 +233,7 @@ if rep is not None:
             st.markdown('<div class="overline">⑤ 不確定因素與分析限制</div>', unsafe_allow_html=True)
             gaps = list(sec_ai.get("data_gaps") or [])
             unconf = [f"【未確認】{x}" for xs in rep_events["unconfirmed"] for x in (xs or [])][:3] if not rep_events.empty else []
-            rows = [f"<li>{ui.labelled(x)}</li>" for x in gaps[:3] + unconf]
+            rows = [f"<li>{ui.labelled('【資料不足】' + x)}</li>" for x in gaps[:3]] + [f"<li>{ui.labelled(x)}</li>" for x in unconf]
             rows.append("<li class='src'>分析限制：AI 只讀得到新聞標題，不是全文；單日漲跌同時受許多因素影響，"
                         "同期變化不代表因果。</li>")
             st.markdown("<ul class='items'>" + "".join(rows) + "</ul>", unsafe_allow_html=True)
@@ -340,14 +342,11 @@ ui.section("市場數據圖表", "滑鼠移到圖上可看每天的數值；所�
 
 # 5-1 台股加權指數（完整寬度）
 ui.subhead("台股加權指數")
-h1, h2 = st.columns([3, 2], vertical_alignment="bottom")
-with h1:
-    tv = today_row["trade_value"] / 1e8 if ui.is_num(today_row["trade_value"]) else None
-    st.markdown(f"<div class='chart-h'><span class='v' style='font-size:1.3rem'>{ui.fmt(today_row['close'])}</span>"
-                f"<span class='u'>點</span><span class='v'>{ui.change_html(today_row['change'], today_row['change_pct'])}</span>"
-                f"<span class='u'>成交金額 {ui.fmt(tv, 0)} 億元・觀察日期 {last:%Y-%m-%d}</span></div>", unsafe_allow_html=True)
-with h2:
-    period = st.segmented_control("觀察期間", list(PERIODS), default="6 個月", key="tx_period", label_visibility="collapsed")
+tv = today_row["trade_value"] / 1e8 if ui.is_num(today_row["trade_value"]) else None
+st.markdown(f"<div class='chart-h'><span class='v' style='font-size:1.3rem'>{ui.fmt(today_row['close'])}</span>"
+            f"<span class='u'>點</span><span class='v'>{ui.change_html(today_row['change'], today_row['change_pct'])}</span>"
+            f"<span class='u'>成交金額 {ui.fmt(tv, 0)} 億元・觀察日期 {last:%Y-%m-%d}</span></div>", unsafe_allow_html=True)
+period = st.segmented_control("觀察期間", list(PERIODS), default="6 個月", key="tx_period")
 days = PERIODS.get(period or "6 個月", 183)
 tx = tx_all[tx_all["trade_date"] >= pd.Timestamp(last - timedelta(days=days))]
 evm = data.events(last - timedelta(days=days))
@@ -425,8 +424,8 @@ for i in range(0, len(codes), 2):
             else:
                 ui.plot(ui.line_chart(s, "obs_date", "value", v["name"], 240, None, unit=str(v["unit"]), digits=dg),
                         key=f"var_{code}")
-            st.markdown(ui.source_line(v["source"], v["date"], unofficial=not bool(v.get("is_official", True))),
-                        unsafe_allow_html=True)
+            st.markdown(ui.source_line(v["source"], v["date"], unofficial=not bool(v.get("is_official", True)))
+                        + "<div class='gap-after'></div>", unsafe_allow_html=True)
 if group in NOT_COLLECTED:
     st.markdown(f"<div class='src'>尚未納入蒐集：{'、'.join(NOT_COLLECTED[group])}（資料尚未取得，不顯示）。"
                 "月資料（CPI、失業率、非農）每月更新一次，圖上每一點是一個月。</div>", unsafe_allow_html=True)

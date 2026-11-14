@@ -29,7 +29,8 @@ FONT = "system-ui, -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft Jhen
 CSS = f"""
 <style>
 .block-container {{padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1240px;}}
-html, body, [class*="st-"] {{font-family: {FONT};}}
+html, body, .stApp, .stMarkdown, .stText, button, input, textarea, select {{font-family: {FONT};}}
+[data-testid="stIconMaterial"], .material-symbols-rounded {{font-family: "Material Symbols Rounded" !important;}}
 h1 {{font-size: 1.75rem !important; font-weight: 700 !important; letter-spacing: .01em;}}
 h3 {{font-size: 1.2rem !important; font-weight: 700 !important; color: {INK};}}
 p, li {{font-size: .95rem; line-height: 1.65;}}
@@ -39,7 +40,9 @@ p, li {{font-size: .95rem; line-height: 1.65;}}
 .sec {{margin: 2.2rem 0 .9rem; padding-left: 12px; border-left: 4px solid {ACCENT};}}
 .sec .t {{font-size: 1.2rem; font-weight: 700; color: {INK}; line-height: 1.35;}}
 .sec .s {{font-size: .85rem; color: {MUTED}; margin-top: 2px;}}
-.subhead {{font-size: 1.0rem; font-weight: 700; color: {INK}; margin: .2rem 0 .5rem;}}
+.subhead {{font-size: 1.05rem; font-weight: 700; color: {INK}; margin: 1.6rem 0 .5rem;}}
+.overline + .subhead {{margin-top: .1rem;}}
+.gap-after {{height: 18px;}}
 .overline {{font-size: .75rem; font-weight: 600; letter-spacing: .06em; color: {MUTED}; text-transform: uppercase;}}
 
 /* 標籤 */
@@ -56,6 +59,9 @@ p, li {{font-size: .95rem; line-height: 1.65;}}
 .lbl.fact {{background: rgba(31,78,140,.10); color:{ACCENT};}}
 .lbl.infer {{background: rgba(98,80,214,.10); color:#4b3bb5;}}
 .lbl.unconf {{background: rgba(237,161,0,.14); color:#8a5a12;}}
+.lbl.gap {{background: {SURFACE}; color:{MUTED}; border:1px solid {BORDER};}}
+.ind {{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}}
+.ind b {{font-size:.98rem;}}
 
 /* 註記與來源 */
 .src {{color:{MUTED}; font-size:.8rem; line-height:1.5;}}
@@ -63,7 +69,7 @@ p, li {{font-size: .95rem; line-height: 1.65;}}
 .muted {{color:{MUTED};}}
 
 /* 指標卡（CSS grid：寬螢幕多欄、手機自動變兩欄或一欄） */
-.kpis {{display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; margin:.2rem 0 .4rem;}}
+.kpis {{display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin:.2rem 0 .4rem;}}
 .kpi {{background:{SURFACE}; border-radius:10px; padding:12px 14px; min-width:0;}}
 .kpi .l {{font-size:.8rem; color:{MUTED}; margin-bottom:2px;}}
 .kpi .v {{font-size:1.45rem; font-weight:700; color:{INK}; font-variant-numeric: tabular-nums; line-height:1.3;
@@ -74,7 +80,7 @@ p, li {{font-size: .95rem; line-height: 1.65;}}
 
 /* 卡片：st.container(border=True, key="card-...") 會帶 st-key-card-... 這個 class */
 [class*="st-key-card"] {{border-color:{BORDER} !important; border-radius:12px !important; background:#fff;}}
-[class*="st-key-panel"] {{background:{SURFACE}; border:none !important; border-radius:12px !important;}}
+[class*="st-key-panel"] {{background:{SURFACE}; border:none !important; border-radius:12px !important; padding:14px 18px;}}
 .card-title {{font-size:1.05rem; font-weight:700; color:{INK}; line-height:1.45; margin:2px 0 6px;}}
 .card-meta {{font-size:.8rem; color:{MUTED}; margin:2px 0 8px;}}
 .card-body {{font-size:.93rem; line-height:1.65; color:{INK};}}
@@ -191,7 +197,7 @@ def stars(n) -> str:
 def labelled(text: str) -> str:
     """把 AI 文字開頭的【事實】【推論】【未確認】換成統一的小標籤。"""
     t = esc(text or "")
-    for key, cls in (("【事實】", "fact"), ("【推論】", "infer"), ("【未確認】", "unconf")):
+    for key, cls in (("【事實】", "fact"), ("【推論】", "infer"), ("【未確認】", "unconf"), ("【資料不足】", "gap")):
         if t.startswith(key):
             return f'<span class="lbl {cls}">{key.strip("【】")}</span>{t[len(key):]}'
     return t
