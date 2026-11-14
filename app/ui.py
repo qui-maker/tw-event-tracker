@@ -296,7 +296,8 @@ def base_layout(fig: go.Figure, height: int = 320, title: str | None = None) -> 
 
 
 def _date_axis(fig: go.Figure):
-    fig.update_xaxes(type="date", tickformatstops=DATE_TICKS, hoverformat="%Y-%m-%d")
+    # 不旋轉日期、最多約 6 個刻度，手機版也不會擠在一起
+    fig.update_xaxes(type="date", tickformatstops=DATE_TICKS, hoverformat="%Y-%m-%d", tickangle=0, nticks=6)
 
 
 def line_chart(df: pd.DataFrame, x: str, y: str, name: str, height: int = 320, title: str | None = None,
