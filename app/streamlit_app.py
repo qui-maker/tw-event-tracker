@@ -18,12 +18,19 @@ pages = [
     st.Page("pages/variables.py", title="國際經濟變項", icon="💹", url_path="variables"),
     st.Page("pages/relations.py", title="事件關聯分析", icon="🔗", url_path="relations"),
     st.Page("pages/history.py", title="歷史資料與報告", icon="🗂️", url_path="history"),
+    st.Page("pages/ask.py", title="AI 問答", icon="💬", url_path="ask"),
 ]
 nav = st.navigation(pages, position="top")
 
 with st.sidebar:
     st.markdown("### 台股與世界重大事件追蹤器")
     st.caption("研究與資料分析工具，不是投資建議。AI 的判斷是事前推論，相關不等於因果。")
+    # AI 問答放在側邊欄，每一頁都可以隨時發問；在全頁問答頁時不重複顯示
+    if nav.url_path != "ask":
+        st.divider()
+        import ai_chat
+        ai_chat.render("sidebar")
+    st.divider()
     st.caption("資料每天自動更新兩次：台北時間約 06:00～07:00（國際新聞與 AI 開盤前判斷）、18:30～19:30（台股收盤）。實際時間依 GitHub 排程而定。")
 
 nav.run()

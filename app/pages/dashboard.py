@@ -239,6 +239,15 @@ if rep is not None:
             st.markdown("<ul class='items'>" + "".join(rows) + "</ul>", unsafe_allow_html=True)
     st.page_link("pages/history.py", label="閱讀完整日報 →")
 
+# 問 AI 入口
+with st.container(key="panel-ask"):
+    st.markdown('<div class="overline">💬 AI 問答</div><div class="subhead">對今天的分析有疑問？直接問 AI</div>'
+                '<div class="src">左側欄每一頁都可以發問（手機請點左上角 » 打開側邊欄），也可以點下面的問題到全頁問答。'
+                'AI 只根據本系統的資料回答。</div>', unsafe_allow_html=True)
+    qcols = st.columns(3)
+    for i, q in enumerate(["最近一個交易日台股為什麼這樣漲跌？", "最近最重要的國際事件可能影響哪些台灣產業？", "AI 的事前判斷目前準確嗎？"]):
+        qcols[i].page_link("pages/ask.py", label=q, query_params={"q": q})
+
 # ═══════════════════════════ 3. 今日國際重大事件 TOP 5 ═══════════════════════════
 ev = data.events(date.today() - timedelta(days=3))
 if ev.empty:
