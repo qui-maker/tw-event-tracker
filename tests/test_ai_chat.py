@@ -23,7 +23,8 @@ class FakeModels:
                 for n in ["gemini-3.8-flash", "gemini-3.7-flash"]]
 
     def generate_content_stream(self, model, contents, config=None):
-        self.calls.append({"model": model, "system": config.system_instruction, "contents": contents})
+        self.calls.append({"model": model, "system": config.system_instruction, "contents": contents,
+                           "thinking": config.thinking_config})
         if self.fail_first and model == "gemini-3.8-flash":
             raise RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
         for piece in ["【事實】測試回答：", "加權指數上漲。"]:
@@ -36,7 +37,7 @@ def fake_gemini(monkeypatch):
     calls = {"list": [], "fail_first": False}
 
     class FakeClient:
-        def __init__(self, api_key):
+        def __init__(self, api_key, http_options=None):
             self.models = FakeModels(calls["list"], calls["fail_first"])
 
     monkeypatch.setattr(google.genai, "Client", FakeClient)
@@ -76,6 +77,7 @@ def test_ask_page_answers_from_database(seeded, fake_gemini):
     assert "台股加權指數" in call["system"] and "國際經濟變項" in call["system"]
     assert "問題提到的日期" in call["system"], "問題提到的日期應補上當天資料"
     assert call["contents"][-1]["parts"][0]["text"] == "11/13 台股為什麼上漲？"
+    assert call["thinking"] is not None and str(call["thinking"].thinking_level).endswith("LOW"), "問答要把思考程度設為低"
 
 
 def test_follow_up_keeps_history_and_falls_back_on_busy_model(seeded, fake_gemini):

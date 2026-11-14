@@ -184,7 +184,7 @@ def base_context() -> tuple[str, dict]:
     else:
         parts.append("## 事前判斷與結果\n目前還沒有事前判斷紀錄（第一筆會在交易日早上開盤前產生）。")
 
-    nw = data.news(today - timedelta(days=3), limit=200)
+    nw = data.news(today - timedelta(days=3), limit=120)
     if not nw.empty:
         parts.append("## 最近 3 天蒐集到的國際新聞標題（GDELT、聯準會；只有標題）\n" + "\n".join(
             f"#{r.id}｜{'' if pd.isna(r.published_at) else f'{r.published_at:%m/%d %H:%M}'}｜{r.source_name or ''}｜{r.title}"
@@ -245,7 +245,9 @@ def question_context(question: str) -> tuple[str, list[str]]:
 @st.cache_resource(show_spinner=False)
 def _client_and_models():
     from google import genai
-    client = genai.Client(api_key=api_key())
+    from google.genai import types
+    # 每次呼叫最多等 60 秒，避免網站一直轉圈
+    client = genai.Client(api_key=api_key(), http_options=types.HttpOptions(timeout=60_000))
     forced = data._setting("GEMINI_MODEL")
     if forced:
         return client, [forced]
@@ -260,6 +262,20 @@ def _client_and_models():
         nums = [int(x) for x in re.findall(r"\d+", n.split("-flash")[0])] or [0]
         return ("preview" not in n and "exp" not in n, "lite" not in n, nums, n)
     return client, sorted(names, key=rank, reverse=True)[:8]
+
+
+def _config(model: str, system: str):
+    """問答不需要長時間「思考」：Gemini 3 以後的模型把思考程度設為低，回應快很多，
+    也避免思考用掉輸出額度而沒有文字（11/14 實測：預設設定下等超過 2 分鐘沒有回應）。"""
+    from google.genai import types
+    major = re.match(r"gemini-(\d+)", model)
+    thinking = None
+    if major and int(major.group(1)) >= 3:
+        thinking = types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
+    elif "2.5" in model:
+        thinking = types.ThinkingConfig(thinking_budget=0 if "lite" in model or "flash" in model else 512)
+    return types.GenerateContentConfig(system_instruction=system, temperature=0.3, max_output_tokens=4096,
+                                       thinking_config=thinking)
 
 
 def _retryable(msg: str) -> bool:
@@ -278,13 +294,16 @@ def answer_stream(question: str, history: list[dict], meta: dict) -> Iterator[st
     contents = [{"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]}
                 for m in history[-HISTORY_TURNS:]]
     contents.append({"role": "user", "parts": [{"text": question}]})
-    config = types.GenerateContentConfig(system_instruction=system, temperature=0.3, max_output_tokens=1500)
-
-    client, models = _client_and_models()
+    try:
+        client, models = _client_and_models()
+    except Exception as e:  # noqa: BLE001  金鑰錯誤或連不到 Google 時，不要讓整頁出錯
+        meta["error"] = f"{type(e).__name__}: {str(e)[:120]}"
+        yield "目前無法連線到 AI 服務（可能是金鑰設定有誤或服務暫時無法使用），請稍後再試。"
+        return
     errors = []
     for model in models:
         try:
-            stream = client.models.generate_content_stream(model=model, contents=contents, config=config)
+            stream = client.models.generate_content_stream(model=model, contents=contents, config=_config(model, system))
             first = True
             for chunk in stream:
                 text = getattr(chunk, "text", None) or ""
@@ -372,7 +391,7 @@ def render(where: str = "sidebar"):
         msgs.append({"role": "user", "content": question})
         meta: dict = {}
         with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("整理系統資料中…"):
+            with st.spinner("整理系統資料並請 AI 回答中（約 10～30 秒）…"):
                 stream = answer_stream(question, history, meta)
                 first = next(stream, "")
             text = st.write_stream(_chain(first, stream))
