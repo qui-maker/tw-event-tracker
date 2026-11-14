@@ -77,7 +77,8 @@ def test_ask_page_answers_from_database(seeded, fake_gemini):
     assert "台股加權指數" in call["system"] and "國際經濟變項" in call["system"]
     assert "問題提到的日期" in call["system"], "問題提到的日期應補上當天資料"
     assert call["contents"][-1]["parts"][0]["text"] == "11/13 台股為什麼上漲？"
-    assert call["thinking"] is not None and str(call["thinking"].thinking_level).endswith("LOW"), "問答要把思考程度設為低"
+    assert call["thinking"] is not None and str(call["thinking"].thinking_level).endswith("MINIMAL"), "問答要把思考程度設為最低"
+    assert "時間順序" in call["system"], "要提醒 AI 美股收盤在台股之後"
 
 
 def test_follow_up_keeps_history_and_falls_back_on_busy_model(seeded, fake_gemini):
