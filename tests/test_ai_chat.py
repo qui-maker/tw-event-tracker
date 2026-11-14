@@ -20,12 +20,12 @@ class FakeModels:
 
     def list(self):
         return [pytypes.SimpleNamespace(name=f"models/{n}", supported_actions=["generateContent"])
-                for n in ["gemini-3.8-flash", "gemini-3.7-flash"]]
+                for n in ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"]]
 
     def generate_content_stream(self, model, contents, config=None):
         self.calls.append({"model": model, "system": config.system_instruction, "contents": contents,
                            "thinking": config.thinking_config})
-        if self.fail_first and model == "gemini-3.8-flash":
+        if self.fail_first and model in ("gemini-3.5-flash-lite", "gemini-3.8-flash"):
             raise RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
         if model == "gemini-3.7-flash" and str(config.thinking_config.thinking_level).endswith("MINIMAL"):
             raise RuntimeError("400 INVALID_ARGUMENT. Thinking level MINIMAL is not supported for this model.")
@@ -75,6 +75,7 @@ def test_ask_page_answers_from_database(seeded, fake_gemini):
     texts = [m.value for m in at.markdown]
     assert any("測試回答" in t for t in texts), "沒有顯示 AI 回答"
     call = fake_gemini["list"][-1]
+    assert call["model"] == "gemini-3.5-flash-lite", "問答優先使用回應較快的 lite 模型"
     assert "測試事件" in call["system"], "參考資料應包含資料庫中的事件"
     assert "台股加權指數" in call["system"] and "國際經濟變項" in call["system"]
     assert "問題提到的日期" in call["system"], "問題提到的日期應補上當天資料"
@@ -84,7 +85,7 @@ def test_ask_page_answers_from_database(seeded, fake_gemini):
 
 
 def test_follow_up_keeps_history_and_falls_back_on_busy_model(seeded, fake_gemini):
-    fake_gemini["fail_first"] = True  # 3.8 忙碌 → 3.7 不支援 MINIMAL → 3.7 用 LOW 成功
+    fake_gemini["fail_first"] = True  # lite 忙碌 → 3.8 忙碌 → 3.7 不支援 MINIMAL → 3.7 用 LOW 成功
     at = run_page("pages/ask.py")
     at.chat_input(key="qa_input_page").set_value("第一題").run()
     at.chat_input(key="qa_input_page").set_value("第二題").run()

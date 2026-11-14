@@ -248,8 +248,8 @@ def question_context(question: str) -> tuple[str, list[str]]:
 def _client_and_models():
     from google import genai
     from google.genai import types
-    # 每次呼叫最多等 60 秒，避免網站一直轉圈
-    client = genai.Client(api_key=api_key(), http_options=types.HttpOptions(timeout=60_000))
+    # 每次呼叫最多等 40 秒，沒有回應就換下一個模型，避免網站一直轉圈
+    client = genai.Client(api_key=api_key(), http_options=types.HttpOptions(timeout=40_000))
     forced = data._setting("GEMINI_MODEL")
     if forced:
         return client, [forced]
@@ -260,9 +260,11 @@ def _client_and_models():
         if "generateContent" in (m.supported_actions or []) and "flash" in name and not any(s in name for s in skip):
             names.append(name)
 
+    # 問答以「回應速度」優先：先用 lite 模型（11/14 實測：Flash 正式版常 503 忙碌或要 30～60 秒才開始回答），
+    # lite 都失敗再改用 Flash 正式版。排程的研究分析仍然優先使用 Flash 正式版（tracker/analysis/llm.py）。
     def rank(n: str):
         nums = [int(x) for x in re.findall(r"\d+", n.split("-flash")[0])] or [0]
-        return ("preview" not in n and "exp" not in n, "lite" not in n, nums, n)
+        return ("preview" not in n and "exp" not in n, "lite" in n, nums, n)
     return client, sorted(names, key=rank, reverse=True)[:8]
 
 
