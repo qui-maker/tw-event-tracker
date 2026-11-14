@@ -1,7 +1,7 @@
 name: 早班（國際新聞、AI 事件分析、事前判斷）
 on:
   schedule:
-    - cron: "13 23 * * *"   # UTC 23:13 = 台北時間 07:13（美股收盤後、台股開盤前）
+    - cron: "47 21 * * *"   # UTC 21:47 = 台北時間 05:47（美股收盤後；GitHub 排程常延遲 30～60 分鐘，提早以確保 09:00 前完成）
   workflow_dispatch:
 concurrency:
   group: pipeline

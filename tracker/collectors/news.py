@@ -27,9 +27,9 @@ def gdelt(timespan: str = "1d", log=None) -> list[dict]:
     rows, seen = [], set()
     for i, (topic, query) in enumerate(GDELT_QUERIES.items()):
         if i:
-            time.sleep(8)  # GDELT 規定每 5 秒最多 1 次；實測 6 秒仍會被擋，放寬到 8 秒
+            time.sleep(15)  # GDELT 規定每 5 秒最多 1 次；GitHub 主機的 IP 與他人共用，實測 8 秒仍常被擋
         articles, last_msg = None, ""
-        for attempt in range(3):
+        for attempt in range(4):
             try:
                 resp = http_get(GDELT_URL, params={"query": query, "mode": "artlist", "format": "json",
                                                    "maxrecords": GDELT_MAX_RECORDS, "timespan": timespan,
@@ -40,7 +40,7 @@ def gdelt(timespan: str = "1d", log=None) -> list[dict]:
                 last_msg = f"回應不是 JSON：{resp.text[:150]}"
             except Exception as e:  # noqa: BLE001
                 last_msg = f"{type(e).__name__}: {e}"
-            time.sleep(12 * (attempt + 1))
+            time.sleep(30)
         if articles is None:
             if log:
                 log.error(f"GDELT {topic}", last_msg)

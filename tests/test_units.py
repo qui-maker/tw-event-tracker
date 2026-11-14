@@ -81,5 +81,5 @@ def test_gemini_falls_back_when_model_overloaded(monkeypatch):
     llm._model_cache.clear()
     obj, model = llm.generate_json("x", Out, "sys")
     assert obj.ok and model == "gemini-3.7-flash"
-    assert calls == ["gemini-3.8-flash"] * 3 + ["gemini-3.7-flash"]
+    assert calls == ["gemini-3.8-flash"] * 2 + ["gemini-3.7-flash"]
     assert llm.gemini_candidates(None)[:3] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite"]

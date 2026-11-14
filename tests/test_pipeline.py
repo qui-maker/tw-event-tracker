@@ -149,6 +149,10 @@ def test_full_pipeline(env):
                "change_pct": 0.9472, "trade_value": 9.9e11, "trade_volume": 1e10, "transactions": 4e6,
                "source": "證交所 FMTQIK", "source_url": "x"}
     env.setattr(twse, "fmtqik_latest", lambda: [close13])
+    # 晚班先用網站版（當天就更新）；這裡讓它失敗，確認會自動改用 OpenAPI
+    def rwd_down(m):
+        raise ConnectionError("測試：網站版 FMTQIK 暫時無法連線")
+    env.setattr(twse, "fmtqik_month", rwd_down)
     env.setattr(twse, "daily_close", lambda d: {"stat": "OK", "indices": [
         {"index_code": "IDX_SEMI", "trade_date": d, "name": "半導體類指數", "close": 1470.0, "change": 7.59, "change_pct": 0.52,
          "trade_value": None, "trade_volume": None, "transactions": None, "source": "證交所 MI_INDEX", "source_url": "x"}],

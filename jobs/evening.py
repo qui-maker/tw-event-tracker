@@ -39,7 +39,14 @@ def main():
     conn = connect()
     with RunLog(conn, "evening") as log:
         with step(log, conn, "加權指數 FMTQIK"):
-            rows = twse.fmtqik_month(d) if args.date else twse.fmtqik_latest()
+            # 網站版（rwd）當天收盤後就更新；OpenAPI 版會晚一天（11/13 實測：晚上 7 點仍沒有當天資料）
+            try:
+                rows = twse.fmtqik_month(d)
+            except Exception as e:  # noqa: BLE001
+                print(f"  網站版 FMTQIK 失敗，改用 OpenAPI：{e}")
+                rows = twse.fmtqik_latest()
+            if not any(r["trade_date"] == d for r in rows):
+                print(f"  FMTQIK 還沒有 {d} 的資料（休市或尚未公布）")
             log.add("index_daily(TAIEX)", insert_ignore(conn, "index_daily", rows, conflict="index_code, trade_date"))
             mark_trading_days(conn, [r["trade_date"] for r in rows], "證交所 FMTQIK 成交資料")
 

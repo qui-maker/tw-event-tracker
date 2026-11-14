@@ -72,29 +72,36 @@ def _gemini(prompt, schema, system, temperature):
     config = types.GenerateContentConfig(system_instruction=system, temperature=temperature,
                                          response_mime_type="application/json", response_schema=schema)
     tried = []
-    for model in gemini_candidates(client)[:5]:
-        last = None
-        for attempt in range(3):
-            try:
-                resp = client.models.generate_content(model=model, contents=prompt, config=config)
-                parsed = resp.parsed if isinstance(resp.parsed, schema) else schema.model_validate_json(_strip(resp.text))
-                if tried:  # 換過模型就記下來，讓研究紀錄看得出這次用的不是首選模型
-                    print(f"  首選模型無法使用，改用 {model}（失敗：{'；'.join(tried)}）")
-                return parsed, model
-            except Exception as e:  # noqa: BLE001
-                last, msg = e, str(e)
-                if "limit: 0" in msg or "not found" in msg.lower() or "NOT_FOUND" in msg:
-                    break  # 這個模型不在免費額度或不存在：直接換下一個
-                if (_is_overloaded(msg) or _is_quota(msg)) and attempt < 2:
-                    time.sleep(15 * (attempt + 1))
-                    continue
-                if "validation" in msg.lower() and attempt < 1:
-                    continue
-                if _is_overloaded(msg) or _is_quota(msg):
-                    break  # 重試後仍忙碌或額度用完：換下一個模型
-                raise LLMError(f"Gemini（{model}）呼叫失敗：{type(e).__name__}: {msg[:500]}") from e
-        tried.append(f"{model}：{type(last).__name__}: {str(last)[:120]}")
-    raise LLMError("所有 Gemini 模型都無法使用：" + "；".join(tried))
+    candidates = gemini_candidates(client)[:10]
+    for round_no in range(2):  # 全部模型都忙碌時，等 2 分鐘再整輪重試一次
+        if round_no:
+            print("  所有 Gemini 模型都忙碌，2 分鐘後再試一輪")
+            time.sleep(120)
+        for model in candidates:
+            last = None
+            for attempt in range(2):
+                try:
+                    resp = client.models.generate_content(model=model, contents=prompt, config=config)
+                    parsed = resp.parsed if isinstance(resp.parsed, schema) else schema.model_validate_json(_strip(resp.text))
+                    if tried:  # 換過模型就印出來，研究紀錄裡也會存實際使用的模型
+                        print(f"  改用 {model}（先前失敗：{len(tried)} 次）")
+                    return parsed, model
+                except Exception as e:  # noqa: BLE001
+                    last, msg = e, str(e)
+                    if "limit: 0" in msg or "NOT_FOUND" in msg or "not found" in msg.lower() or "no longer available" in msg:
+                        break  # 不在免費額度、已下架或不存在：直接換下一個
+                    if (_is_overloaded(msg) or _is_quota(msg)) and attempt < 1:
+                        time.sleep(15)
+                        continue
+                    if "validation" in msg.lower() and attempt < 1:
+                        continue
+                    if _is_overloaded(msg) or _is_quota(msg):
+                        break  # 重試後仍忙碌或額度用完：換下一個模型
+                    raise LLMError(f"Gemini（{model}）呼叫失敗：{type(e).__name__}: {msg[:500]}") from e
+            tried.append(f"{model}：{type(last).__name__}: {str(last)[:100]}")
+            if last is not None and ("NOT_FOUND" in str(last) or "no longer available" in str(last) or "limit: 0" in str(last)):
+                candidates = [m for m in candidates if m != model]  # 第二輪不用再試
+    raise LLMError(f"所有 Gemini 模型都無法使用（試了 {len(tried)} 次）：" + "；".join(tried[-6:]))
 
 
 def _claude(prompt, schema, system, temperature):
