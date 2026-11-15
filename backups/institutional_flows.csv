@@ -1,0 +1,13 @@
+trade_date,investor,buy,sell,net,source,source_url,fetched_at
+2026-11-12,自營商(自行買賣),10389859921.0,13370626923.0,-2980767002.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261112,2026-11-13 04:16:54.583105+00:00
+2026-11-12,自營商(避險),35694946033.0,39255147321.0,-3560201288.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261112,2026-11-13 04:16:54.583105+00:00
+2026-11-12,投信,24753483175.0,12185923367.0,12567559808.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261112,2026-11-13 04:16:54.583105+00:00
+2026-11-12,外資及陸資(不含外資自營商),399926836289.0,400611340172.0,-684503883.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261112,2026-11-13 04:16:54.583105+00:00
+2026-11-12,外資自營商,0.0,0.0,0.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261112,2026-11-13 04:16:54.583105+00:00
+2026-11-12,合計,470765125418.0,465423037783.0,5342087635.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261112,2026-11-13 04:16:54.583105+00:00
+2026-11-13,自營商(自行買賣),10166324554.0,5867507194.0,4298817360.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261113,2026-11-13 11:15:21.890023+00:00
+2026-11-13,自營商(避險),40132703884.0,37539044199.0,2593659685.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261113,2026-11-13 11:15:21.890023+00:00
+2026-11-13,投信,28619148385.0,20382392434.0,8236755951.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261113,2026-11-13 11:15:21.890023+00:00
+2026-11-13,外資及陸資(不含外資自營商),376254786479.0,347418100428.0,28836686051.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261113,2026-11-13 11:15:21.890023+00:00
+2026-11-13,外資自營商,0.0,0.0,0.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261113,2026-11-13 11:15:21.890023+00:00
+2026-11-13,合計,455172963302.0,411207044255.0,43965919047.0,證交所 BFI82U,https://www.twse.com.tw/rwd/zh/fund/BFI82U?type=day&dayDate=20261113,2026-11-13 11:15:21.890023+00:00

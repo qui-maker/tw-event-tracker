@@ -1,0 +1,20 @@
+code,name,category,unit,frequency,source,source_series,is_official,description,display_order
+FED_RATE,聯邦基金利率目標上限,利率,%,日,FRED,DFEDTARU,True,,0
+EFFR,有效聯邦基金利率,利率,%,日,FRED,DFF,True,,1
+US2Y,美國 2 年期公債殖利率,利率,%,日,FRED,DGS2,True,,2
+US10Y,美國 10 年期公債殖利率,利率,%,日,FRED,DGS10,True,,3
+US_CPI,美國消費者物價指數,美國經濟數據,指數（1982-84=100）,月,FRED,CPIAUCSL,True,,4
+US_UNRATE,美國失業率,美國經濟數據,%,月,FRED,UNRATE,True,,5
+US_NFP,美國非農就業人數,美國經濟數據,千人,月,FRED,PAYEMS,True,,6
+USD_BROAD,廣義美元指數,匯率,指數（2006-01=100）,日,FRED,DTWEXBGS,True,,7
+USDTWD,新台幣兌美元,匯率,新台幣／美元,日,FRED,DEXTAUS,True,,8
+WTI,WTI 原油,原物料,美元／桶,日,FRED,DCOILWTICO,True,,9
+BRENT,Brent 原油,原物料,美元／桶,日,FRED,DCOILBRENTEU,True,,10
+SPX,S&P 500 指數,國際股市,點,日,FRED,SP500,True,,11
+NASDAQ,Nasdaq 綜合指數,國際股市,點,日,FRED,NASDAQCOM,True,,12
+SOX,費城半導體指數,國際股市,點,日,Yahoo,^SOX,False,,13
+TSM_ADR,台積電 ADR,國際股市,美元,日,Yahoo,TSM,False,,14
+NIKKEI,日經 225 指數,國際股市,點,日,Yahoo,^N225,False,,15
+VIX,VIX 波動率指數,國際股市,點,日,Yahoo,^VIX,False,,16
+DXY,美元指數 DXY,匯率,點,日,Yahoo,DX-Y.NYB,False,,17
+GOLD,黃金期貨,原物料,美元／盎司,日,Yahoo,GC=F,False,,18
