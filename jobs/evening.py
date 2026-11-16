@@ -17,7 +17,7 @@ from tracker import reports
 from tracker.analysis import evaluate
 from tracker.calendar import mark_trading_days
 from tracker.collectors import macro, tpex, twse
-from tracker.db import RunLog, connect, insert_ignore, step, upsert
+from tracker.db import fetch_one, RunLog, connect, insert_ignore, step, upsert
 from tracker.utils import today_taipei
 
 
@@ -85,7 +85,12 @@ def main():
         with step(log, conn, "評估事前判斷"):
             evaluate.run(conn, log, d)
         with step(log, conn, "日報"):
-            reports.build_daily(conn, log, d)
+            # 排程執行時，如果當天已經手動提早跑過、日報已存在，就不重複產生新版本（手動指定 --date 時仍會產生新版本）
+            exists = fetch_one(conn, "select 1 as x from reports where kind = 'daily' and period_key = %s", (d.isoformat(),))
+            if exists and not args.date:
+                print(f"  {d} 的日報已經存在，排程不重複產生")
+            else:
+                reports.build_daily(conn, log, d)
 
 
 if __name__ == "__main__":
