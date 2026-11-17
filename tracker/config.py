@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 # 提示詞與評估規則的版本號（改規則時一定要改版本號，舊結果會保留）
-PROMPT_VERSION = "p3"  # p2：產業只能從證交所類股清單選（11/14）；p3：加入美股與台股收盤時間順序規則（11/16）
+PROMPT_VERSION = "p4"  # p2：產業用證交所類股（11/14）；p3：美股與台股收盤時間順序（11/16）；p4：事件附首則新聞時間、亞股時間規則（11/17）
 EVAL_METHOD_VERSION = "v1"
 
 # ─────────────────────────────────────────────

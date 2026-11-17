@@ -9,7 +9,7 @@ from tracker.analysis.grading import abs_grade
 from tracker.analysis.llm import generate_json
 from tracker.analysis.prompts import COMMON_RULES, PREDICTION_TASK, PredictionOut
 from tracker.calendar import market_open
-from tracker.config import OVERNIGHT_VARIABLES, PROMPT_VERSION
+from tracker.config import TAIPEI, OVERNIGHT_VARIABLES, PROMPT_VERSION
 from tracker.utils import change_text
 from tracker.db import fetch_all, fetch_one, insert_ignore
 
@@ -50,6 +50,10 @@ def _exists(conn, kind: str, target: date) -> bool:
                      (kind, target)) is not None
 
 
+def _tpe(ts) -> str:
+    return "不明" if ts is None else ts.astimezone(TAIPEI).strftime("%Y-%m-%d %H:%M")
+
+
 def baseline(conn, log, target: date, now: datetime) -> bool:
     """對照規則：費城半導體指數（SOX）最近一次收盤上漲 → 預測加權指數上漲；下跌 → 預測下跌。"""
     if _exists(conn, "baseline", target):
@@ -78,13 +82,15 @@ def ai_prediction(conn, log, target: date, now: datetime, event_ids: list[str]) 
     prev = fetch_one(conn, "select max(trade_date) as d from index_daily where index_code = 'TAIEX' and trade_date < %s",
                      (target,))
     since = prev["d"] if prev and prev["d"] else now.date() - timedelta(days=1)
-    events = fetch_all(conn, "select id, name, event_type, importance, direction, summary, pathway from events "
+    events = fetch_all(conn, "select id, name, event_type, importance, direction, summary, pathway, first_published_at from events "
                              "where analysis_date > %s and analysis_date <= %s order by importance desc, id limit 20",
                        (since, now.date()))
     variables = latest_variables(conn, OVERNIGHT_VARIABLES)
     taiex = taiex_recent(conn)
-    ev_text = "\n".join(f"{e['id']}｜{e['event_type']}｜重要程度 {e['importance']}｜對大盤可能方向：{e['direction']}｜"
-                        f"{e['name']}｜{e['summary']}｜路徑：{' → '.join(e['pathway'] or [])}" for e in events) or "（今天沒有辨識出重大事件）"
+    # 附上首則新聞的發布時間（台北），讓 AI 知道事件是「什麼時候」發生的，不要把分析日期當成發生日期
+    ev_text = "\n".join(f"{e['id']}｜首則新聞 {_tpe(e['first_published_at'])}｜{e['event_type']}｜重要程度 {e['importance']}｜"
+                        f"對大盤可能方向：{e['direction']}｜{e['name']}｜{e['summary']}｜路徑：{' → '.join(e['pathway'] or [])}"
+                        for e in events) or "（今天沒有辨識出重大事件）"
     var_text = "\n".join(f"{v['code']} {v['name']}：{v['value']} {v['unit']}（{v['date']}），較前一筆 "
                          f"{v['change_text']}"
                          f"{'' if v['official'] else '（非官方）'}" for v in variables) or "（無資料）"
