@@ -18,7 +18,7 @@ from tracker.analysis import evaluate
 from tracker.calendar import mark_trading_days
 from tracker.collectors import macro, tpex, twse
 from tracker.db import fetch_one, RunLog, connect, insert_ignore, step, upsert
-from tracker.utils import today_taipei
+from tracker.utils import now_taipei, today_taipei
 
 
 def save_stocks(conn, log, rows: list[dict], market: str):
@@ -28,6 +28,19 @@ def save_stocks(conn, log, rows: list[dict], market: str):
            key="code", update_cols=["name", "market"])
     daily = [{k: v for k, v in r.items() if k != "name"} for r in rows]
     log.add(f"stock_daily({market})", insert_ignore(conn, "stock_daily", daily, conflict="code, trade_date"))
+
+
+LAST_RUN_HOUR = 18  # 最後一次晚班排程（台北 18:17）之後，資料未齊也照樣產生日報
+
+
+def missing_inputs(conn, d: date) -> list[str]:
+    """日報需要的當天資料還缺哪些。休市日三項都會缺，此時由 18:17 那次排程照常產生（內容會標示休市）。"""
+    checks = {
+        "加權指數": "select 1 as x from index_daily where index_code = 'TAIEX' and trade_date = %s",
+        "類股指數": "select 1 as x from index_daily where index_code like 'IDX_%%' and trade_date = %s",
+        "三大法人": "select 1 as x from institutional_flows where trade_date = %s",
+    }
+    return [name for name, sql in checks.items() if not fetch_one(conn, sql, (d,))]
 
 
 def main():
@@ -87,8 +100,13 @@ def main():
         with step(log, conn, "日報"):
             # 排程執行時，如果當天已經手動提早跑過、日報已存在，就不重複產生新版本（手動指定 --date 時仍會產生新版本）
             exists = fetch_one(conn, "select 1 as x from reports where kind = 'daily' and period_key = %s", (d.isoformat(),))
+            missing = missing_inputs(conn, d)
             if exists and not args.date:
                 print(f"  {d} 的日報已經存在，排程不重複產生")
+            elif missing and not args.date and now_taipei().hour < LAST_RUN_HOUR:
+                # 證交所類股指數與三大法人約 14:30～15:30 才公布；太早產生的日報會缺資料，且之後的排程不會再重做
+                # 所以資料未齊時先不產生，留給下一次排程（18:17 那次無論如何都會產生，缺的部分在日報中標示）
+                print(f"  {d} 尚缺：{'、'.join(missing)}，日報留給下一次排程產生")
             else:
                 reports.build_daily(conn, log, d)
 

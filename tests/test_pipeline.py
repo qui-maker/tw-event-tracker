@@ -183,6 +183,19 @@ def test_full_pipeline(env):
     runs = fetch_all(conn, "select job, status, errors from pipeline_runs order by id")
     assert all(r["status"] in ("success", "partial") for r in runs), runs
 
+    # 4b. 資料未齊時，15:13 那次排程不產生日報（留給下一次）；18 點以後的最後一次照常產生
+    assert jobs.evening.missing_inputs(conn, today) == []
+    next_day = date(2026, 11, 16)
+    env.setattr(twse, "institutional", lambda d: [])  # 三大法人尚未公布
+    env.setattr(jobs.evening, "today_taipei", lambda: next_day)
+    env.setattr(jobs.evening, "now_taipei", lambda: datetime(2026, 11, 16, 15, 40, tzinfo=timezone(timedelta(hours=8))))
+    jobs.evening.main()
+    assert jobs.evening.missing_inputs(conn, next_day) == ["加權指數", "三大法人"] or "三大法人" in jobs.evening.missing_inputs(conn, next_day)
+    assert not fetch_one(conn, "select 1 as x from reports where kind = 'daily' and period_key = '2026-11-16'")
+    env.setattr(jobs.evening, "now_taipei", lambda: datetime(2026, 11, 16, 18, 40, tzinfo=timezone(timedelta(hours=8))))
+    jobs.evening.main()
+    assert fetch_one(conn, "select 1 as x from reports where kind = 'daily' and period_key = '2026-11-16'")
+
     # 5. 週報與備份
     env.setattr(jobs.periodic, "today_taipei", lambda: date(2026, 11, 15))
     env.setattr("sys.argv", ["periodic", "--kind", "weekly"])

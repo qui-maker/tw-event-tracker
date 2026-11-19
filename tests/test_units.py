@@ -1,6 +1,8 @@
 """不需要網路與資料庫的單元測試。執行：pytest tests/test_units.py"""
 from datetime import date
 
+import pytest
+
 from tracker.analysis.grading import abs_grade, direction, rel_label, z_score
 from tracker.utils import roc_to_date, sign_from_html, title_fingerprint, to_number
 
@@ -69,7 +71,8 @@ def test_gemini_falls_back_when_model_overloaded(monkeypatch):
             return pytypes.SimpleNamespace(parsed=Out(ok=True), text='{"ok": true}')
 
     class FakeClient:
-        def __init__(self, api_key):
+        def __init__(self, api_key, http_options=None):
+            assert http_options is not None and http_options.timeout == llm.CALL_TIMEOUT_S * 1000  # 單次呼叫一定要有逾時
             self.models = FakeModels()
 
     import google.genai
@@ -99,3 +102,93 @@ def test_change_text_uses_points_for_rates():
     assert change_text(5.10, 4.98, "%") == "+0.12 個百分點"
     assert change_text(110, 100, "點") == "+10.00%"
     assert change_text(1, None, "%") == "—"
+
+
+def _fake_gemini(monkeypatch, behaviour):
+    """建立假的 Gemini：behaviour(model) 回傳結果或丟出例外。"""
+    import types as pytypes
+    import google.genai
+    from tracker.analysis import llm
+
+    calls = []
+
+    class FakeModels:
+        def list(self):
+            return [pytypes.SimpleNamespace(name=f"models/{n}", supported_actions=["generateContent"])
+                    for n in ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.8-flash-lite"]]
+
+        def generate_content(self, model, contents, config=None):
+            calls.append(model)
+            return behaviour(model)
+
+    class FakeClient:
+        def __init__(self, api_key, http_options=None):
+            self.models = FakeModels()
+
+    monkeypatch.setattr(google.genai, "Client", FakeClient)
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("AI_PROVIDER", raising=False)
+    llm._model_cache.clear()
+    return calls
+
+
+def test_gemini_timeout_switches_model(monkeypatch):
+    """單次呼叫逾時（2026-11-19 早班被取消的原因）要直接換下一個模型，不在同一個模型上重試。"""
+    import types as pytypes
+    from pydantic import BaseModel
+    from tracker.analysis import llm
+
+    class Out(BaseModel):
+        ok: bool
+
+    def behaviour(model):
+        if model == "gemini-3.8-flash":
+            raise RuntimeError("ReadTimeout: The read operation timed out")
+        return pytypes.SimpleNamespace(parsed=Out(ok=True), text='{"ok": true}')
+
+    calls = _fake_gemini(monkeypatch, behaviour)
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    obj, model = llm.generate_json("x", Out, "sys")
+    assert model == "gemini-3.7-flash" and calls == ["gemini-3.8-flash", "gemini-3.7-flash"]
+
+
+def test_gemini_gives_up_after_budget(monkeypatch):
+    """所有模型都忙碌時，超過時間上限就放棄（不能拖到 GitHub 把整個工作取消）。"""
+    from pydantic import BaseModel
+    from tracker.analysis import llm
+
+    class Out(BaseModel):
+        ok: bool
+
+    clock = [0.0]
+    monkeypatch.setattr(llm.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(llm.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + s))
+
+    def behaviour(model):
+        clock[0] += 100  # 每次呼叫花 100 秒後回 503
+        raise RuntimeError("503 UNAVAILABLE")
+
+    calls = _fake_gemini(monkeypatch, behaviour)
+    with pytest.raises(llm.LLMError, match="時間上限|無法使用"):
+        llm.generate_json("x", Out, "sys", budget_s=600)
+    assert clock[0] <= 600 + 100 and len(calls) <= 6
+
+
+def test_gdelt_stops_at_budget(monkeypatch):
+    """GDELT 一直沒回應時，全部主題合計不超過時間上限。"""
+    from tracker.collectors import news
+
+    clock = [0.0]
+    monkeypatch.setattr(news.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(news.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + s))
+
+    def hang(*a, **k):
+        clock[0] += 30
+        raise TimeoutError("read timed out")
+
+    monkeypatch.setattr(news, "http_get", hang)
+    errors = []
+    log = type("L", (), {"error": lambda self, where, msg: errors.append((where, msg))})()
+    assert news.gdelt("1d", log, budget_s=200) == []
+    assert clock[0] <= 200 + 30 and len(errors) == len(news.GDELT_QUERIES)

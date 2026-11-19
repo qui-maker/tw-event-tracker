@@ -49,37 +49,59 @@ def _is_overloaded(msg: str) -> bool:
     return any(k in msg for k in ("503", "UNAVAILABLE", "500", "INTERNAL", "overloaded", "high demand"))
 
 
+def _is_timeout(msg: str) -> bool:
+    low = msg.lower()
+    return "timed out" in low or "timeout" in low or "deadline" in low
+
+
 def _is_quota(msg: str) -> bool:
     return any(k in msg for k in ("429", "RESOURCE_EXHAUSTED"))
 
 
-def generate_json(prompt: str, schema: type[BaseModel], system: str, temperature: float = 0.2) -> tuple[BaseModel, str]:
-    """送出提示詞，回傳（符合 schema 的物件, 使用的模型名稱）。"""
+# 單次呼叫最長等待秒數，以及一次 generate_json（含換模型、重試）的總時間上限。
+# 2026-11-19 早班因 Gemini 呼叫沒有逾時設定、一直等待，超過 GitHub 30 分鐘上限被取消（決策紀錄 #46）。
+CALL_TIMEOUT_S = int(os.getenv("GEMINI_CALL_TIMEOUT", "150"))
+DEFAULT_BUDGET_S = int(os.getenv("LLM_BUDGET_SECONDS", "600"))
+
+
+def generate_json(prompt: str, schema: type[BaseModel], system: str, temperature: float = 0.2,
+                  budget_s: int | None = None) -> tuple[BaseModel, str]:
+    """送出提示詞，回傳（符合 schema 的物件, 使用的模型名稱）。超過 budget_s 秒仍沒有結果就放棄。"""
     provider = os.getenv("AI_PROVIDER", "gemini").lower()
     if provider == "claude":
         return _claude(prompt, schema, system, temperature)
-    return _gemini(prompt, schema, system, temperature)
+    return _gemini(prompt, schema, system, temperature, budget_s or DEFAULT_BUDGET_S)
 
 
-def _gemini(prompt, schema, system, temperature):
+def _gemini(prompt, schema, system, temperature, budget_s=DEFAULT_BUDGET_S):
     from google import genai
     from google.genai import types
 
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise LLMError("沒有設定 GEMINI_API_KEY")
-    client = genai.Client(api_key=key)
+    deadline = time.monotonic() + budget_s
+    client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=CALL_TIMEOUT_S * 1000))
     config = types.GenerateContentConfig(system_instruction=system, temperature=temperature,
                                          response_mime_type="application/json", response_schema=schema)
     tried = []
     candidates = gemini_candidates(client)[:10]
-    for round_no in range(2):  # 全部模型都忙碌時，等 2 分鐘再整輪重試一次
+
+    def out_of_time(need: float = 20) -> bool:
+        return time.monotonic() + need > deadline
+
+    for round_no in range(2):  # 全部模型都忙碌時，等 2 分鐘再整輪重試一次（時間不夠就不等）
         if round_no:
+            if out_of_time(120 + 60):
+                break
             print("  所有 Gemini 模型都忙碌，2 分鐘後再試一輪")
             time.sleep(120)
         for model in candidates:
             last = None
             for attempt in range(2):
+                if out_of_time():
+                    raise LLMError(f"AI 呼叫超過時間上限 {budget_s} 秒仍未完成（試了 {len(tried)} 個模型）："
+                                   + "；".join(tried[-4:]))
                 try:
                     resp = client.models.generate_content(model=model, contents=prompt, config=config)
                     parsed = resp.parsed if isinstance(resp.parsed, schema) else schema.model_validate_json(_strip(resp.text))
@@ -90,6 +112,8 @@ def _gemini(prompt, schema, system, temperature):
                     last, msg = e, str(e)
                     if "limit: 0" in msg or "NOT_FOUND" in msg or "not found" in msg.lower() or "no longer available" in msg:
                         break  # 不在免費額度、已下架或不存在：直接換下一個
+                    if _is_timeout(msg):
+                        break  # 單次逾時：換下一個模型
                     if (_is_overloaded(msg) or _is_quota(msg)) and attempt < 1:
                         time.sleep(15)
                         continue

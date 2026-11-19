@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      PYTHONUNBUFFERED: "1"   # 即時輸出紀錄；被取消時也看得到跑到哪一步
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       AI_PROVIDER: ${{ vars.AI_PROVIDER }}

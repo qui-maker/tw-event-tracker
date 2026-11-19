@@ -23,24 +23,35 @@ def _gdelt_time(s: str):
         return None
 
 
-def gdelt(timespan: str = "1d", log=None) -> list[dict]:
+GDELT_BUDGET_S = 420  # 全部主題合計最多花 7 分鐘；GDELT 限流或沒回應時不能拖垮整個早班（決策紀錄 #46）
+
+
+def gdelt(timespan: str = "1d", log=None, budget_s: float = GDELT_BUDGET_S) -> list[dict]:
     rows, seen = [], set()
+    deadline = time.monotonic() + budget_s
     for i, (topic, query) in enumerate(GDELT_QUERIES.items()):
-        if i:
+        def time_left() -> float:
+            return deadline - time.monotonic()
+
+        if i and time_left() > 15 + 30:
             time.sleep(15)  # GDELT 規定每 5 秒最多 1 次；GitHub 主機的 IP 與他人共用，實測 8 秒仍常被擋
         articles, last_msg = None, ""
-        for attempt in range(4):
+        for attempt in range(3):
+            if time_left() < 30:
+                last_msg = last_msg or f"超過 GDELT 時間上限 {budget_s:.0f} 秒，略過"
+                break
             try:
                 resp = http_get(GDELT_URL, params={"query": query, "mode": "artlist", "format": "json",
                                                    "maxrecords": GDELT_MAX_RECORDS, "timespan": timespan,
-                                                   "sort": "hybridrel"}, timeout=40)
+                                                   "sort": "hybridrel"}, timeout=30, retries=0)
                 articles = resp.json().get("articles", [])
                 break
             except ValueError:  # 被限流時 GDELT 回傳純文字說明，不是 JSON
                 last_msg = f"回應不是 JSON：{resp.text[:150]}"
             except Exception as e:  # noqa: BLE001
                 last_msg = f"{type(e).__name__}: {e}"
-            time.sleep(30)
+            if attempt < 2 and time_left() > 25 + 30:
+                time.sleep(25)
         if articles is None:
             if log:
                 log.error(f"GDELT {topic}", last_msg)

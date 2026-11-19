@@ -9,8 +9,9 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     env:
+      PYTHONUNBUFFERED: "1"   # 即時輸出紀錄；被取消時也看得到跑到哪一步
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
