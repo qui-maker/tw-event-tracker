@@ -34,7 +34,7 @@ Streamlit 網站（六個頁面）
 | 櫃買指數 | 櫃買中心 OpenAPI | 官方 | 不需要 |
 | 美國利率、殖利率、CPI、就業、匯率、油價、美股指數 | 美國聯準會 FRED | 官方 | 需要（免費） |
 | 費半、台積電 ADR、日經、VIX、美元指數、黃金 | Yahoo Finance（yfinance） | **非官方**，網站會標示 | 不需要 |
-| 國際新聞 | GDELT DOC 2.0 | 新聞索引（只有標題與網址） | 不需要 |
+| 國際新聞 | CNBC、BBC、MarketWatch 官方 RSS；Google News 搜尋 RSS；GDELT DOC 2.0 | 只存標題、網址、媒體、發布時間 | 不需要 |
 | 聯準會新聞稿 | Fed RSS | 官方 | 不需要 |
 | AI 分析 | Google Gemini（免費額度） | — | 需要（免費） |
 
@@ -49,7 +49,7 @@ app/                 Streamlit 網站
   data.py            資料讀取（唯讀）
   ui.py              格式、顏色、圖表元件
 tracker/             資料蒐集與分析
-  collectors/        證交所、櫃買、FRED／Yahoo、GDELT／Fed
+  collectors/        證交所、櫃買、FRED／Yahoo、RSS／GDELT／Fed
   analysis/          AI 事件分析、事前判斷、評估、漲跌幅分級
   reports.py         日報、週報、月報
   db.py              資料庫寫入與執行紀錄

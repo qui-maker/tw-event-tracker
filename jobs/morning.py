@@ -1,6 +1,6 @@
 """早班（台北時間約 07:15，美股收盤後、台股開盤前）
 
-1. 蒐集國際新聞（GDELT、聯準會新聞稿）並去重
+1. 蒐集國際新聞（媒體 RSS、Google News、GDELT、聯準會新聞稿）並去重
 2. 更新國際經濟與市場變項（FRED、Yahoo）
 3. AI 辨識重大事件與傳導路徑
 4. 寫下今天（或下一個交易日）加權指數的事前判斷：AI 一筆、對照規則一筆
@@ -39,6 +39,8 @@ def main():
     today = now.date()
     conn = connect()
     with RunLog(conn, "morning") as log:
+        with step(log, conn, "RSS 新聞"):
+            log.add("news(RSS)", store_news(conn, news.rss_feeds(log)))
         with step(log, conn, "GDELT 新聞"):
             log.add("news(GDELT)", store_news(conn, news.gdelt("1d", log)))
         with step(log, conn, "聯準會新聞稿"):

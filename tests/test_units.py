@@ -192,3 +192,26 @@ def test_gdelt_stops_at_budget(monkeypatch):
     log = type("L", (), {"error": lambda self, where, msg: errors.append((where, msg))})()
     assert news.gdelt("1d", log, budget_s=200) == []
     assert clock[0] <= 200 + 30 and len(errors) == len(news.GDELT_QUERIES)
+
+
+def test_rss_rows_keep_source_time_and_drop_undated(monkeypatch):
+    """RSS：保留原始網址、媒體與發布時間；沒有時間或太舊的不收；Google News 標題去掉「 - 媒體」並記錄媒體名稱。"""
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    from tracker.collectors import news
+
+    now = datetime.now(timezone.utc)
+    fresh, old = format_datetime(now - timedelta(hours=2)), format_datetime(now - timedelta(days=3))
+    xml = f"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+      <item><title>Chip stocks slide - Reuters</title><link>https://news.google.com/rss/articles/abc</link>
+        <pubDate>{fresh}</pubDate><source url="https://www.reuters.com">Reuters</source></item>
+      <item><title>Old story</title><link>https://x.example/old</link><pubDate>{old}</pubDate></item>
+      <item><title>No date</title><link>https://x.example/nodate</link></item>
+    </channel></rss>""".encode()
+    rows = news._rss_rows(xml, "科技與半導體", "Google News RSS", None, None)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["title"] == "Chip stocks slide" and r["source_name"] == "Reuters"
+    assert r["url"] == "https://news.google.com/rss/articles/abc" and r["published_at"] is not None
+    rows = news._rss_rows(xml, "綜合財經", "媒體 RSS", "cnbc.com", "United States")
+    assert [x["source_name"] for x in rows] == ["cnbc.com"] and rows[0]["title"] == "Chip stocks slide - Reuters"

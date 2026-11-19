@@ -1,4 +1,4 @@
-"""新聞蒐集：GDELT（全球新聞，免金鑰）與聯準會新聞稿 RSS（官方）。
+"""新聞蒐集：媒體官方 RSS、Google News 搜尋 RSS、GDELT（全球新聞，免金鑰）與聯準會新聞稿 RSS（官方）。
 
 只保存標題、網址、媒體、發布時間等資訊，不轉存新聞全文。
 """
@@ -9,7 +9,10 @@ from datetime import datetime, timedelta, timezone
 
 import feedparser
 
-from tracker.config import GDELT_MAX_RECORDS, GDELT_QUERIES
+from urllib.parse import quote_plus
+
+from tracker.config import (GDELT_MAX_RECORDS, GDELT_QUERIES, GOOGLE_NEWS_QUERIES, RSS_FEEDS, RSS_MAX_AGE_HOURS,
+                            RSS_MAX_PER_FEED)
 from tracker.utils import http_get, title_fingerprint
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
@@ -23,7 +26,7 @@ def _gdelt_time(s: str):
         return None
 
 
-GDELT_BUDGET_S = 420  # 全部主題合計最多花 7 分鐘；GDELT 限流或沒回應時不能拖垮整個早班（決策紀錄 #46）
+GDELT_BUDGET_S = 240  # 全部主題合計最多花 4 分鐘；GDELT 限流或沒回應時不能拖垮整個早班（決策紀錄 #46）
 
 
 def gdelt(timespan: str = "1d", log=None, budget_s: float = GDELT_BUDGET_S) -> list[dict]:
@@ -84,3 +87,54 @@ def fed_press(days: int = 3) -> list[dict]:
                      "language": "English", "country": "United States", "published_at": published,
                      "topic": "貨幣政策", "collector": "Fed RSS", "title_fingerprint": title_fingerprint(title)})
     return [r for r in rows if r["url"]]
+
+
+GOOGLE_NEWS_URL = "https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+
+
+def _rss_rows(content: bytes, topic: str, collector: str, source_name: str | None, country: str | None) -> list[dict]:
+    """解析 RSS；沒有發布時間或超過 RSS_MAX_AGE_HOURS 的新聞不收（所有資料都要有日期時間）。"""
+    feed = feedparser.parse(content)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=RSS_MAX_AGE_HOURS)
+    rows = []
+    for e in feed.entries:
+        p = e.get("published_parsed") or e.get("updated_parsed")
+        if not p:
+            continue
+        published = datetime(*p[:6], tzinfo=timezone.utc)
+        title, url = (e.get("title") or "").strip(), e.get("link")
+        if published < cutoff or not title or not url:
+            continue
+        src = source_name
+        if collector == "Google News RSS":
+            src = (e.get("source") or {}).get("title") or "Google News"
+            suffix = f" - {src}"
+            if title.endswith(suffix):  # Google News 會在標題後面加「 - 媒體名稱」
+                title = title[: -len(suffix)].strip()
+        rows.append({"url": url, "title": title[:500], "source_name": src, "language": "English", "country": country,
+                     "published_at": published, "topic": topic, "collector": collector,
+                     "title_fingerprint": title_fingerprint(title)})
+        if len(rows) >= RSS_MAX_PER_FEED:
+            break
+    return rows
+
+
+def rss_feeds(log=None) -> list[dict]:
+    """媒體官方 RSS 與 Google News 搜尋 RSS。單一來源失敗只記錄錯誤，不影響其他來源。"""
+    rows = []
+    jobs = [(name, url, topic, src, country, "媒體 RSS") for name, (url, topic, src, country) in RSS_FEEDS.items()]
+    jobs += [(f"Google News {topic}", GOOGLE_NEWS_URL.format(q=quote_plus(q + " when:1d")), topic, None, None,
+              "Google News RSS") for topic, q in GOOGLE_NEWS_QUERIES.items()]
+    for name, url, topic, src, country, collector in jobs:
+        try:
+            resp = http_get(url, timeout=25, retries=1)
+            resp.raise_for_status()
+            got = _rss_rows(resp.content, topic, collector, src, country)
+            if not got and log:
+                log.error(f"RSS {name}", "沒有 36 小時內的新聞")
+            rows += got
+        except Exception as e:  # noqa: BLE001
+            if log:
+                log.error(f"RSS {name}", f"{type(e).__name__}: {str(e)[:150]}")
+        time.sleep(1)
+    return rows

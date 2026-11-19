@@ -188,7 +188,7 @@ def base_context() -> tuple[str, dict]:
 
     nw = data.news(today - timedelta(days=3), limit=120)
     if not nw.empty:
-        parts.append("## 最近 3 天蒐集到的國際新聞標題（GDELT、聯準會；只有標題）\n" + "\n".join(
+        parts.append("## 最近 3 天蒐集到的國際新聞標題（媒體 RSS、Google News、GDELT、聯準會；只有標題）\n" + "\n".join(
             f"#{r.id}｜{'' if pd.isna(r.published_at) else f'{r.published_at:%m/%d %H:%M}'}｜{r.source_name or ''}｜{r.title}"
             for r in nw.itertuples()))
         scope["新聞標題"] = f"{len(nw)} 則"

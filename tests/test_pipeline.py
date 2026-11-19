@@ -79,6 +79,10 @@ def test_full_pipeline(env):
         for i, t in enumerate(["Nvidia CEO resigns", "Fed officials signal more hikes", "Oil jumps after tankers hit",
                                "Treasury yields climb", "TSMC shares fall", "Nvidia CEO resigns (copy)"])])
     env.setattr(news, "fed_press", lambda: [])
+    env.setattr(news, "rss_feeds", lambda log=None: [
+        {"url": "https://rss.example/1", "title": "TEST 測試資料（非真實）Chip stocks slide", "source_name": "example.com",
+         "language": "English", "country": "United States", "published_at": now_utc, "topic": "科技與半導體",
+         "collector": "媒體 RSS", "title_fingerprint": "rss1"}])
 
     def fake_llm(prompt, schema, system, temperature=0.2):
         if schema is EventsOut:
@@ -130,12 +134,12 @@ def test_full_pipeline(env):
     assert {p["id"] for p in preds} == {"PR-20261113-AI", "PR-20261113-BASE"}
     assert all(p["is_ex_ante"] for p in preds)
     assert next(p for p in preds if p["kind"] == "baseline")["direction"] == "下跌"
-    assert fetch_one(conn, "select count(*) n from news")["n"] == 6
+    assert fetch_one(conn, "select count(*) n from news")["n"] == 7  # GDELT 6 則 ＋ RSS 1 則
 
     # 重跑早班不會重複新增預測或新聞
     jobs.morning.main()
     assert fetch_one(conn, "select count(*) n from predictions")["n"] == 2
-    assert fetch_one(conn, "select count(*) n from news")["n"] == 6
+    assert fetch_one(conn, "select count(*) n from news")["n"] == 7  # GDELT 6 則 ＋ RSS 1 則
 
     # 3. 研究紀錄不可修改
     import psycopg

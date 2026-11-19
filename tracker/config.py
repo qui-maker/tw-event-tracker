@@ -58,6 +58,31 @@ GDELT_QUERIES = {
 GDELT_MAX_RECORDS = 75
 
 # ─────────────────────────────────────────────
+# 公開 RSS 新聞（決策紀錄 #49）：GDELT 自 11/18 起幾乎抓不到新聞，改以媒體官方 RSS 為主要來源。
+# 2026-11-19 以 GitHub Actions 實測（jobs/probe_feeds.py）：以下來源都能連上，且有 24 小時內的新聞與發布時間。
+# 格式：名稱 → (網址, 蒐集主題, 媒體, 國家)
+# ─────────────────────────────────────────────
+RSS_FEEDS = {
+    "CNBC 頭條": ("https://www.cnbc.com/id/100003114/device/rss/rss.html", "綜合財經", "cnbc.com", "United States"),
+    "CNBC 國際": ("https://www.cnbc.com/id/100727362/device/rss/rss.html", "國際", "cnbc.com", "United States"),
+    "CNBC 經濟": ("https://www.cnbc.com/id/20910258/device/rss/rss.html", "貨幣政策與經濟", "cnbc.com", "United States"),
+    "CNBC 科技": ("https://www.cnbc.com/id/19854910/device/rss/rss.html", "科技與半導體", "cnbc.com", "United States"),
+    "BBC 商業": ("https://feeds.bbci.co.uk/news/business/rss.xml", "綜合財經", "bbc.co.uk", "United Kingdom"),
+    "BBC 亞洲": ("https://feeds.bbci.co.uk/news/world/asia/rss.xml", "地緣政治", "bbc.co.uk", "United Kingdom"),
+    "MarketWatch 頭條": ("https://feeds.content.dowjones.io/public/rss/mw_topstories", "市場", "marketwatch.com", "United States"),
+}
+# Google News 搜尋 RSS：補足台灣、半導體等主題。網址是 Google News 的轉址連結，媒體名稱取自 RSS 的 <source>
+GOOGLE_NEWS_QUERIES = {
+    "台灣": "Taiwan stocks OR TAIEX OR Taiwan economy",
+    "科技與半導體": "TSMC OR semiconductor OR chipmaker OR Nvidia",
+    "國際貿易": "tariff OR \"export controls\" OR \"trade war\"",
+    "貨幣政策": "\"Federal Reserve\" OR \"central bank\" OR inflation",
+    "能源與原物料": "\"oil prices\" OR OPEC OR crude",
+}
+RSS_MAX_AGE_HOURS = 36
+RSS_MAX_PER_FEED = 40
+
+# ─────────────────────────────────────────────
 # 證交所指數名稱 → 本專案代碼（沒列到的類股指數會自動用「IDX:名稱」）
 # ─────────────────────────────────────────────
 INDEX_CODES = {
