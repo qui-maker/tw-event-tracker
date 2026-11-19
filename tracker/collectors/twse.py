@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import time
+
 import re
 from datetime import date
 
@@ -36,6 +38,13 @@ def _tables(payload: dict) -> list[tuple[str, list, list]]:
         if payload.get(f"fields{i}") and payload.get(f"data{i}"):
             out.append((payload.get(f"subtitle{i}") or "", payload[f"fields{i}"], payload[f"data{i}"]))
     return out
+
+
+def _nocache() -> str:
+    """加在網址後面的時間戳記，避免拿到快取的舊回應（證交所網站自己的查詢頁面也會加 _=時間戳記）。
+    11/19 實測：瀏覽器在 15:03 已查得到當天三大法人，GitHub 主機在 15:06 用同一個網址仍拿到「沒有資料」，
+    因為 14:52 那次查詢時的「沒有資料」回應被快取了（決策紀錄 #50）。"""
+    return str(int(time.time() * 1000))
 
 
 def _col(fields: list, *keywords) -> int | None:
@@ -79,7 +88,7 @@ def fmtqik_month(month: date, exact_day: bool = False) -> list[dict]:
     還沒有當天資料的舊回應，同一時間用當天日期查詢已經有資料，推測是快取，所以晚班改用當天日期。"""
     url = f"{RWD}/afterTrading/FMTQIK"
     query = month.strftime("%Y%m%d" if exact_day else "%Y%m01")
-    resp = http_get(url, params={"date": query, "response": "json"})
+    resp = http_get(url, params={"date": query, "response": "json", "_": _nocache()})
     resp.raise_for_status()
     payload = resp.json()
     if payload.get("stat") not in ("OK", None):
@@ -108,7 +117,8 @@ def daily_close(d: date) -> dict:
     """網站資料 MI_INDEX（type=ALLBUT0999）：一次取得指定日期的類股指數、漲跌家數與上市個股收盤。
     回傳 {"indices": [...], "breadth": {...} 或 None, "stocks": [...], "stat": str}。"""
     url = f"{RWD}/afterTrading/MI_INDEX"
-    resp = http_get(url, params={"date": d.strftime("%Y%m%d"), "type": "ALLBUT0999", "response": "json"}, timeout=60)
+    resp = http_get(url, params={"date": d.strftime("%Y%m%d"), "type": "ALLBUT0999", "response": "json", "_": _nocache()},
+                    timeout=60)
     resp.raise_for_status()
     payload = resp.json()
     src_url = f"{url}?date={d:%Y%m%d}&type=ALLBUT0999"
@@ -232,7 +242,7 @@ def indices_openapi_latest() -> list[dict]:
 # ─────────────────────────────────────────────
 def institutional(d: date) -> list[dict]:
     url = f"{RWD}/fund/BFI82U"
-    resp = http_get(url, params={"type": "day", "dayDate": d.strftime("%Y%m%d"), "response": "json"})
+    resp = http_get(url, params={"type": "day", "dayDate": d.strftime("%Y%m%d"), "response": "json", "_": _nocache()})
     resp.raise_for_status()
     payload = resp.json()
     if payload.get("stat") != "OK":
