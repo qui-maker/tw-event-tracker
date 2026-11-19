@@ -65,7 +65,7 @@ def test_full_pipeline(env):
 
     env.setattr(twse, "holidays", lambda: [{"date": date(2026, 10, 10), "is_trading_day": False, "note": "國慶日",
                                             "source": "證交所 休市公告"}])
-    env.setattr(twse, "fmtqik_month", lambda m: [r for r in all_rows if (r["trade_date"].year, r["trade_date"].month) == (m.year, m.month)])
+    env.setattr(twse, "fmtqik_month", lambda m, exact_day=False: [r for r in all_rows if (r["trade_date"].year, r["trade_date"].month) == (m.year, m.month)])
     env.setattr(macro, "collect_all", lambda start, log=None: [
         {"variable_code": "SOX", "obs_date": date(2026, 11, 11), "value": 10564.1, "source": "Yahoo Finance（非官方）", "source_url": "x"},
         {"variable_code": "SOX", "obs_date": date(2026, 11, 12), "value": 10506.67, "source": "Yahoo Finance（非官方）", "source_url": "x"},
@@ -154,7 +154,7 @@ def test_full_pipeline(env):
                "source": "證交所 FMTQIK", "source_url": "x"}
     env.setattr(twse, "fmtqik_latest", lambda: [close13])
     # 晚班先用網站版（當天就更新）；這裡讓它失敗，確認會自動改用 OpenAPI
-    def rwd_down(m):
+    def rwd_down(m, exact_day=False):
         raise ConnectionError("測試：網站版 FMTQIK 暫時無法連線")
     env.setattr(twse, "fmtqik_month", rwd_down)
     env.setattr(twse, "daily_close", lambda d: {"stat": "OK", "indices": [

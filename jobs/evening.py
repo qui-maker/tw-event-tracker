@@ -54,7 +54,7 @@ def main():
         with step(log, conn, "加權指數 FMTQIK"):
             # 網站版（rwd）當天收盤後就更新；OpenAPI 版會晚一天（11/13 實測：晚上 7 點仍沒有當天資料）
             try:
-                rows = twse.fmtqik_month(d)
+                rows = twse.fmtqik_month(d, exact_day=True)
             except Exception as e:  # noqa: BLE001
                 print(f"  網站版 FMTQIK 失敗，改用 OpenAPI：{e}")
                 rows = twse.fmtqik_latest()
