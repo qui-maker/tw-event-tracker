@@ -78,7 +78,8 @@ def fmtqik_month(month: date, exact_day: bool = False) -> list[dict]:
     exact_day=True 時用當天日期查詢（回傳的仍是整個月）：11/19 實測，晚班用「月初日期」查詢時拿到的是
     還沒有當天資料的舊回應，同一時間用當天日期查詢已經有資料，推測是快取，所以晚班改用當天日期。"""
     url = f"{RWD}/afterTrading/FMTQIK"
-    resp = http_get(url, params={"date": month.strftime("%Y%m%d" if exact_day else "%Y%m01"), "response": "json"})
+    query = month.strftime("%Y%m%d" if exact_day else "%Y%m01")
+    resp = http_get(url, params={"date": query, "response": "json"})
     resp.raise_for_status()
     payload = resp.json()
     if payload.get("stat") not in ("OK", None):
@@ -96,7 +97,7 @@ def fmtqik_month(month: date, exact_day: bool = False) -> list[dict]:
                                         r[i_val] if i_val is not None else None,
                                         r[i_trans] if i_trans is not None else None,
                                         r[i_close], r[i_chg] if i_chg is not None else None,
-                                        f"{url}?date={month:%Y%m}01"))
+                                        f"{url}?date={query}"))
     return rows
 
 

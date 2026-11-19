@@ -95,8 +95,12 @@ with st.container(key="panel-pred"):
     with pcols[1]:
         nxt = pr[pr["target_trading_day"].dt.date >= last].sort_values("target_trading_day") if not pr.empty else pr
         if nxt.empty:
-            st.markdown('<div class="card-body">目前沒有待驗證的事前判斷。AI 與對照規則會在<b>交易日早上 09:00 開盤前</b>寫下當天大盤方向，'
-                        '收盤後自動比對。</div>', unsafe_allow_html=True)
+            # 最新交易日沒有事前判斷時要明白標示是缺口（例如 11/19 早班被取消，決策紀錄 #47），不是還沒到時間
+            had_today = (not pr.empty) and (pr["target_trading_day"].dt.date == last).any()
+            gap = "" if had_today else (f"<b>{last:%Y-%m-%d} 沒有事前判斷</b>（當天開盤前的自動排程沒有完成，"
+                                        "09:00 之後補寫不算事前判斷，所以不補做；詳見決策紀錄）。<br>")
+            st.markdown(f'<div class="card-body">{gap}目前沒有待驗證的事前判斷。AI 與對照規則會在<b>交易日早上 09:00 開盤前</b>'
+                        '寫下當天大盤方向，收盤後自動比對。</div>', unsafe_allow_html=True)
         else:
             tday = nxt["target_trading_day"].max()
             parts = []
