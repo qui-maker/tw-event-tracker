@@ -1,3 +1,8 @@
 trade_date,market,advances,declines,unchanged,limit_up,limit_down,source,source_url,fetched_at
 2026-11-12,TWSE,277,730,75,12,10,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261112&type=ALLBUT0999,2026-11-13 04:16:52.879575+00:00
 2026-11-13,TWSE,811,199,74,28,3,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261113&type=ALLBUT0999,2026-11-13 11:15:19.833027+00:00
+2026-11-16,TWSE,99,948,36,8,83,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261116&type=ALLBUT0999,2026-11-16 09:35:56.244719+00:00
+2026-11-17,TWSE,234,789,61,6,30,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261117&type=ALLBUT0999,2026-11-17 08:45:18.294597+00:00
+2026-11-18,TWSE,492,520,71,21,4,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261118&type=ALLBUT0999,2026-11-18 08:23:26.974180+00:00
+2026-11-19,TWSE,67,993,25,1,128,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261119&type=ALLBUT0999,2026-11-19 06:52:23.309781+00:00
+2026-11-20,TWSE,16,1058,11,4,179,證交所 MI_INDEX,https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=20261120&type=ALLBUT0999,2026-11-20 08:23:57.640450+00:00
