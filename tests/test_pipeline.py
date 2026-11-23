@@ -193,6 +193,13 @@ def test_full_pipeline(env):
     runs = fetch_all(conn, "select job, status, errors from pipeline_runs order by id")
     assert all(r["status"] in ("success", "partial") for r in runs), runs
 
+    # 4a. 週末的日報寫「休市」，不是「缺資料」
+    from tracker import reports
+    fake_log = type("L", (), {"add": lambda self, *a: None, "error": lambda self, *a: None})()
+    reports.build_daily(conn, fake_log, date(2026, 11, 15))
+    md = fetch_one(conn, "select content_md from reports where kind = 'daily' and period_key = '2026-11-15'")["content_md"]
+    assert "今天休市" in md and "最近一個交易日 2026-11-13" in md
+
     # 4b. 資料未齊時，15:13 那次排程不產生日報（留給下一次）；18 點以後的最後一次照常產生
     assert jobs.evening.missing_inputs(conn, today) == []
     next_day = date(2026, 11, 16)

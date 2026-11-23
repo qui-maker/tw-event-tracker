@@ -9,6 +9,7 @@ from psycopg.types.json import Jsonb
 
 from tracker.analysis.grading import abs_grade, rel_label, z_score
 from tracker.analysis.llm import generate_json
+from tracker.calendar import is_trading_day
 from tracker.analysis.predict import latest_variables
 from tracker.analysis.prompts import COMMON_RULES, REPORT_TASK, ReportOut
 from tracker.config import OVERNIGHT_VARIABLES, REL_WINDOW
@@ -66,6 +67,11 @@ def _next_version(conn, kind, key) -> int:
 def build_daily(conn, log, d: date) -> int | None:
     title = f"《{d:%Y/%m/%d} 台股與世界重大事件日報》"
     tx = _taiex_with_grades(conn, d)
+    # 休市日（週末、國定假日）要明白寫「休市」，不是「缺資料」（11/22 週日日報寫成「缺乏台股數據」）
+    closed = tx is None and not is_trading_day(conn, d)
+    last_tx = None if not closed else fetch_one(
+        conn, "select trade_date, close, change_pct from index_daily where index_code = 'TAIEX' and trade_date < %s "
+              "order by trade_date desc limit 1", (d,))
     tpex = fetch_one(conn, "select * from index_daily where index_code='TPEX' and trade_date=%s", (d,))
     breadth = fetch_one(conn, "select * from market_breadth where trade_date=%s and market='TWSE'", (d,))
     flows = fetch_all(conn, "select investor, net from institutional_flows where trade_date=%s", (d,))
@@ -102,7 +108,12 @@ def build_daily(conn, log, d: date) -> int | None:
             bottom = "、".join(f"{s['name']} {_fmt(s['change_pct'], signed=True)}%" for s in sectors[-3:])
             md += ["", f"- 類股表現最強：{top}", f"- 類股表現最弱：{bottom}"]
     else:
-        md.append("今天沒有加權指數收盤資料（休市，或證交所資料尚未公布）。")
+        if closed:
+            md.append(f"今天休市（非交易日），沒有台股交易。"
+                      + ("" if not last_tx else f"最近一個交易日 {last_tx['trade_date']} 加權指數收盤 {_fmt(last_tx['close'])} 點"
+                                                f"（{_fmt(last_tx['change_pct'], signed=True)}%）。"))
+        else:
+            md.append("今天沒有加權指數收盤資料（證交所資料尚未公布或無法取得）。")
     md.append("")
 
     # 2. 國際重大事件 TOP 5
@@ -151,7 +162,10 @@ def build_daily(conn, log, d: date) -> int | None:
 
     # AI 文字段落
     context = json.dumps({
-        "台股": None if not tx else {"收盤": float(tx["close"]), "漲跌幅%": round(float(tx["change_pct"]), 2), "等級": tx["grade_label"],
+        "台股": ("今天休市（非交易日），沒有台股交易；不要寫成缺少資料"
+                 + ("" if not last_tx else f"。最近一個交易日 {last_tx['trade_date']} 收盤 {float(last_tx['close'])}"
+                                           f"（{float(last_tx['change_pct']):+.2f}%）")) if closed else
+                None if not tx else {"收盤": float(tx["close"]), "漲跌幅%": round(float(tx["change_pct"]), 2), "等級": tx["grade_label"],
                                      "成交金額(億元)": None if tx.get("trade_value") is None else round(float(tx["trade_value"]) / 1e8, 2),
                                      "相對波動": tx["rel_label"]},
         "上漲下跌家數": None if not breadth else {"上漲": breadth["advances"], "下跌": breadth["declines"]},
