@@ -122,7 +122,7 @@ def test_full_pipeline(env):
     from tracker.config import TAIPEI
     fixed_now = datetime(2026, 11, 13, 7, 15, tzinfo=TAIPEI)
     env.setattr(jobs.morning, "now_taipei", lambda: fixed_now)
-    jobs.morning.main()
+    jobs.morning.main([])
     evs = fetch_all(conn, "select * from events order by id")
     assert [e["id"] for e in evs] == ["EV-20261113-01", "EV-20261113-02"]
     assert evs[0]["facts"] == [{"text": "輝達宣布執行長辭職", "news_ids": [1]}]           # 沒有來源的事實被移除
@@ -136,8 +136,14 @@ def test_full_pipeline(env):
     assert next(p for p in preds if p["kind"] == "baseline")["direction"] == "下跌"
     assert fetch_one(conn, "select count(*) n from news")["n"] == 7  # GDELT 6 則 ＋ RSS 1 則
 
+    # 備援排程：主排程已完成 → 直接結束，不新增執行紀錄、不重做事件分析
+    n_runs = fetch_one(conn, "select count(*) n from pipeline_runs")["n"]
+    jobs.morning.main(["--if-missing"])
+    assert fetch_one(conn, "select count(*) n from pipeline_runs")["n"] == n_runs
+    assert fetch_one(conn, "select count(*) n from events")["n"] == 2
+
     # 重跑早班不會重複新增預測或新聞
-    jobs.morning.main()
+    jobs.morning.main([])
     assert fetch_one(conn, "select count(*) n from predictions")["n"] == 2
     assert fetch_one(conn, "select count(*) n from news")["n"] == 7  # GDELT 6 則 ＋ RSS 1 則
 

@@ -2,6 +2,7 @@ name: 早班（國際新聞、AI 事件分析、事前判斷）
 on:
   schedule:
     - cron: "47 21 * * *"   # UTC 21:47 = 台北時間 05:47（美股收盤後；GitHub 排程常延遲 30～60 分鐘，提早以確保 09:00 前完成）
+    - cron: "17 23 * * 0-4" # 備援：台北週一～週五 07:17（實際約 08:00）。主排程已完成就直接結束，失敗時補做（決策紀錄 #53）
   workflow_dispatch:
 concurrency:
   group: pipeline
@@ -25,4 +26,4 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-jobs.txt
       - run: pip install -r requirements-jobs.txt
-      - run: python -m jobs.morning
+      - run: python -m jobs.morning ${{ github.event.schedule == '17 23 * * 0-4' && '--if-missing' || '' }}
